@@ -1,14 +1,16 @@
-use actix_web::{post, web, HttpResponse, Responder};
+use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
 use crypto::{digest::Digest, sha2::Sha256};
-use jwt_simple::prelude::{Duration, *};
-use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait};
+use jwt_simple::prelude::Duration;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+};
 use validator::Validate;
 
 use crate::{
     entities::{prelude::*, user},
-    extractors::jwt_cred::JwtCred,
+    extractors::jwt_cred::{get_token_from_req, AuthError, JwtCred},
     models::{
-        auth::{SignUpData, Tokens},
+        auth::{SignInData, SignUpData, Tokens},
         common::ErrorResponse,
     },
     utils::jwt::scopes,
@@ -73,6 +75,154 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
     update_user_refresh(res.last_insert_id, db, Some(refresh.clone())).await;
 
     HttpResponse::Created().json(Tokens { access, refresh })
+}
+
+#[post("/signin")]
+pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) -> impl Responder {
+    let db = &app_data.conn;
+    let jwt = &app_data.jwt;
+
+    let user = User::find()
+        .filter(user::Column::Email.eq(data.email.clone()))
+        .one(db)
+        .await
+        .unwrap();
+
+    let user = match user {
+        Some(user) => user,
+        None => {
+            return HttpResponse::NotFound().json(ErrorResponse {
+                message: String::from("user not found"),
+            })
+        }
+    };
+
+    let valid = bcrypt::verify(data.password.clone(), &user.password_hash).unwrap();
+    if !valid {
+        return HttpResponse::Forbidden().json(ErrorResponse {
+            message: String::from("invalid password"),
+        });
+    }
+
+    let access = jwt
+        .encode_token(
+            JwtCred {
+                uid: user.id,
+                email: user.email.clone(),
+                scope: scopes::ACCESS.to_string(),
+            },
+            Duration::from_mins(20),
+        )
+        .unwrap();
+    let refresh = jwt
+        .encode_token(
+            JwtCred {
+                uid: user.id,
+                email: user.email.clone(),
+                scope: scopes::REFRESH.to_string(),
+            },
+            Duration::from_days(14),
+        )
+        .unwrap();
+
+    update_user_refresh(user.id, db, Some(refresh.clone())).await;
+
+    HttpResponse::Ok().json(Tokens { access, refresh })
+}
+
+#[post("/logout")]
+pub async fn logout(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
+    let db = &app_data.conn;
+
+    if let None = User::find_by_id(creds.uid).one(db).await.unwrap() {
+        return HttpResponse::NotFound();
+    }
+
+    update_user_refresh(creds.uid, db, None).await;
+
+    HttpResponse::Ok()
+}
+
+#[post("/refresh")]
+pub async fn refresh_token(req: HttpRequest, app_data: web::Data<AppState>) -> impl Responder {
+    let db = &app_data.conn;
+    let jwt = &app_data.jwt;
+
+    let token = get_token_from_req(req);
+
+    let claims: JwtCred = match token {
+        Ok(ref token) => match jwt.get_claims(&token.as_str(), scopes::REFRESH) {
+            Some(claims) => claims,
+            None => {
+                return HttpResponse::BadRequest().json(ErrorResponse {
+                    message: String::from("invalid token format"),
+                })
+            }
+        },
+        Err(err) => match err {
+            AuthError::Unauthorized => {
+                return HttpResponse::Unauthorized().json(ErrorResponse {
+                    message: String::from("authorization header is missing"),
+                })
+            }
+            AuthError::InvalidToken => {
+                return HttpResponse::BadRequest().json(ErrorResponse {
+                    message: String::from("invalid token format"),
+                })
+            }
+        },
+    };
+
+    let user = User::find_by_id(claims.uid).one(db).await.unwrap();
+    let user = match user {
+        Some(user) => user,
+        None => {
+            return HttpResponse::NotFound().json(ErrorResponse {
+                message: String::from("user not found"),
+            })
+        }
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.input_str(token.unwrap().as_str());
+    let hashed_refresh = hasher.result_str();
+
+    if let None = user.refresh_token_hash {
+        return HttpResponse::Unauthorized().json(ErrorResponse {
+            message: String::from("user not unauthorized"),
+        });
+    }
+
+    if user.refresh_token_hash.unwrap().as_str() != hashed_refresh.as_str() {
+        return HttpResponse::Unauthorized().json(ErrorResponse {
+            message: String::from("token are invalid"),
+        });
+    }
+
+    let access = jwt
+        .encode_token(
+            JwtCred {
+                uid: user.id,
+                email: user.email.clone(),
+                scope: scopes::ACCESS.to_string(),
+            },
+            Duration::from_mins(20),
+        )
+        .unwrap();
+    let refresh = jwt
+        .encode_token(
+            JwtCred {
+                uid: user.id,
+                email: user.email.clone(),
+                scope: scopes::REFRESH.to_string(),
+            },
+            Duration::from_days(14),
+        )
+        .unwrap();
+
+    update_user_refresh(user.id, db, Some(refresh.clone())).await;
+
+    HttpResponse::Ok().json(Tokens { access, refresh })
 }
 
 async fn update_user_refresh(id: i32, db: &DatabaseConnection, token: Option<String>) {
