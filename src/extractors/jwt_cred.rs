@@ -1,0 +1,51 @@
+use actix_web::{dev::Payload, error, http::header, Error, FromRequest, HttpRequest};
+use futures_util::future::ready;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    get_key,
+    utils::jwt::{scopes, JwtUtil},
+};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JwtCred {
+    pub uid: i32,
+    pub email: String,
+    pub scope: String,
+}
+
+impl FromRequest for JwtCred {
+    type Error = Error;
+    type Future = futures_util::future::Ready<Result<Self, Self::Error>>;
+
+    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+        match get_tokens_from_req(req.clone()) {
+            Ok(token) => {
+                let jwt_controller = JwtUtil { key: get_key() };
+
+                match jwt_controller.get_claims(&token.as_str(), scopes::ACCESS) {
+                    Some(claims) => return ready(Ok(claims)),
+                    None => return ready(Err(error::ErrorBadRequest("invalid token format"))),
+                }
+            }
+            Err(err) => ready(Err(err)),
+        }
+    }
+}
+
+fn get_tokens_from_req(req: HttpRequest) -> Result<String, error::Error> {
+    match req.headers().get(header::AUTHORIZATION) {
+        Some(beared_token) => {
+            if let Ok(token_str) = beared_token.to_str() {
+                if let Some(token) = token_str.split(' ').last() {
+                    Ok(token.to_string())
+                } else {
+                    Err(error::ErrorBadRequest("invalid token format"))
+                }
+            } else {
+                Err(error::ErrorBadRequest("invalid token format"))
+            }
+        }
+        None => Err(error::ErrorUnauthorized("authorization header is missgin")),
+    }
+}
