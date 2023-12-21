@@ -3,20 +3,16 @@ use actix_web::test::{self, TestRequest};
 use actix_web::{http::StatusCode, App};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use fake::{
     faker::internet::raw::{FreeEmail, Password, Username},
     locales::EN,
     Fake,
 };
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
+use rc_api::services::user::find_user_by_email;
 use rc_api::{
-    entities::{prelude::User, user},
-    get_app_data, get_db_conn, get_key,
-    models::auth::*,
-    repos::auth::*,
-    utils::jwt::JwtUtil,
+    get_app_data, get_db_conn, get_key, models::auth::*, repos::auth::*, utils::jwt::JwtUtil,
 };
 
 fn signin_req(data: SignInData) -> TestRequest {
@@ -57,12 +53,7 @@ async fn test_signup() {
 
     let db = &get_db_conn().await;
 
-    let user: user::Model = User::find()
-        .filter(user::Column::Email.eq(email))
-        .one(db)
-        .await
-        .unwrap()
-        .unwrap();
+    let user = find_user_by_email(&email, db).await.unwrap();
 
     assert!(user.refresh_token_hash.is_some());
 }
@@ -86,12 +77,7 @@ async fn test_signup_tokens() {
 
     let db = &get_db_conn().await;
 
-    let user: user::Model = User::find()
-        .filter(user::Column::Email.eq(email))
-        .one(db)
-        .await
-        .unwrap()
-        .unwrap();
+    let user = find_user_by_email(&email, db).await.unwrap();
 
     // check refresh token are hashed
     let mut hasher = Sha256::new();
@@ -189,12 +175,7 @@ async fn test_signin() {
 
     let db = &get_db_conn().await;
 
-    let user: user::Model = User::find()
-        .filter(user::Column::Email.eq(email))
-        .one(db)
-        .await
-        .unwrap()
-        .unwrap();
+    let user = find_user_by_email(&email, db).await.unwrap();
 
     assert!(user.refresh_token_hash.is_some());
 }
@@ -263,12 +244,7 @@ async fn test_logout() {
 
     let db = &get_db_conn().await;
 
-    let user: user::Model = User::find()
-        .filter(user::Column::Email.eq(email))
-        .one(db)
-        .await
-        .unwrap()
-        .unwrap();
+    let user = find_user_by_email(&email, db).await.unwrap();
 
     assert!(user.refresh_token_hash.is_none());
 }
@@ -308,26 +284,14 @@ async fn test_logout_and_signin() {
 
     let db = &get_db_conn().await;
 
-    let user: user::Model = User::find()
-        .filter(user::Column::Email.eq(email.clone()))
-        .one(db)
-        .await
-        .unwrap()
-        .unwrap();
-
+    let user = find_user_by_email(&email, db).await.unwrap();
     assert!(user.refresh_token_hash.is_none());
 
     let signin_res = signin_req(signin_data).send_request(&app).await;
 
     assert_eq!(signin_res.status(), StatusCode::OK);
 
-    let user: user::Model = User::find()
-        .filter(user::Column::Email.eq(email.clone()))
-        .one(db)
-        .await
-        .unwrap()
-        .unwrap();
-
+    let user = find_user_by_email(&email, db).await.unwrap();
     assert!(user.refresh_token_hash.is_some());
 }
 
@@ -418,12 +382,7 @@ async fn test_refresh_token() {
 
     let db = &get_db_conn().await;
 
-    let user: user::Model = User::find()
-        .filter(user::Column::Email.eq(email))
-        .one(db)
-        .await
-        .unwrap()
-        .unwrap();
+    let user = find_user_by_email(&email, db).await.unwrap();
 
     let mut hasher = Sha256::new();
     hasher.input_str(tokens.refresh.as_str());

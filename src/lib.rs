@@ -1,7 +1,7 @@
-pub mod entities;
 pub mod extractors;
 pub mod models;
 pub mod repos;
+pub mod services;
 pub mod utils;
 
 extern crate crypto;
@@ -9,21 +9,23 @@ extern crate crypto;
 use std::env;
 
 use actix_web::web;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use jwt_simple::algorithms::HS256Key;
-use sea_orm::{Database, DatabaseConnection};
+use sqlx::{Pool, Postgres};
 use utils::jwt::JwtUtil;
 
 #[derive(Debug)]
 pub struct AppState {
-    pub conn: DatabaseConnection,
+    pub pool: Pool<Postgres>,
     pub jwt: JwtUtil,
 }
 
-pub async fn get_db_conn() -> DatabaseConnection {
+pub async fn get_db_conn() -> Pool<Postgres> {
     dotenv().ok();
-    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
-    Database::connect(db_url).await.unwrap()
+    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    sqlx::postgres::PgPool::connect(&db_url)
+        .await
+        .expect("couldn't connected to database")
 }
 
 pub fn get_key() -> HS256Key {
@@ -34,10 +36,10 @@ pub fn get_key() -> HS256Key {
 
 pub async fn get_app_data() -> web::Data<AppState> {
     let key = get_key();
-    let conn = get_db_conn().await;
+    let pool = get_db_conn().await;
 
     web::Data::new(AppState {
-        conn,
+        pool,
         jwt: JwtUtil { key },
     })
 }

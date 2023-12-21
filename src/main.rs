@@ -2,7 +2,7 @@ use std::env;
 
 use actix_cors::Cors;
 use actix_web::{get, middleware::Logger, web, App, HttpResponse, HttpServer, Responder};
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use rc_api::get_app_data;
 
 #[get("/")]
