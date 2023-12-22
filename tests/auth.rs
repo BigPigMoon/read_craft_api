@@ -9,35 +9,43 @@ use fake::{
     locales::EN,
     Fake,
 };
+use rc_api::main_config;
 
 use rc_api::services::user::find_user_by_email;
-use rc_api::{
-    get_app_data, get_db_conn, get_key, models::auth::*, repos::auth::*, utils::jwt::JwtUtil,
-};
+use rc_api::{get_app_data, get_db_conn, get_key, models::auth::*, utils::jwt::JwtUtil};
+
+fn signup_req(data: SignUpData) -> TestRequest {
+    test::TestRequest::post()
+        .uri("/api/auth/signup")
+        .set_json(data)
+}
 
 fn signin_req(data: SignInData) -> TestRequest {
-    test::TestRequest::post().uri("/signin").set_json(data)
+    test::TestRequest::post()
+        .uri("/api/auth/signin")
+        .set_json(data)
 }
 
 fn logout_req(token: &str) -> TestRequest {
     test::TestRequest::post()
-        .uri("/logout")
+        .uri("/api/auth/logout")
         .insert_header((header::AUTHORIZATION, format!("Bearer {}", token)))
 }
 
 fn refresh_req(token: &str) -> TestRequest {
     test::TestRequest::post()
-        .uri("/refresh")
+        .uri("/api/auth/refresh")
         .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
-}
-
-fn signup_req(data: SignUpData) -> TestRequest {
-    test::TestRequest::post().uri("/signup").set_json(data)
 }
 
 #[actix_web::test]
 async fn test_signup() {
-    let app = test::init_service(App::new().app_data(get_app_data().await).service(signup)).await;
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
 
     let email: String = FreeEmail(EN).fake();
 
@@ -60,7 +68,12 @@ async fn test_signup() {
 
 #[actix_web::test]
 async fn test_signup_tokens() {
-    let app = test::init_service(App::new().app_data(get_app_data().await).service(signup)).await;
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
     let email: String = FreeEmail(EN).fake();
 
     let signup_res = signup_req(SignUpData {
@@ -96,7 +109,12 @@ async fn test_signup_tokens() {
 
 #[actix_web::test]
 async fn test_signup_duplicated() {
-    let app = test::init_service(App::new().app_data(get_app_data().await).service(signup)).await;
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
 
     let data = SignUpData {
         email: FreeEmail(EN).fake(),
@@ -114,7 +132,12 @@ async fn test_signup_duplicated() {
 
 #[actix_web::test]
 async fn test_signup_fields_empty() {
-    let app = test::init_service(App::new().app_data(get_app_data().await).service(signup)).await;
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
 
     let data = SignUpData {
         email: String::from(""),
@@ -130,7 +153,12 @@ async fn test_signup_fields_empty() {
 async fn test_signup_invalid_email() {
     dotenv().ok();
 
-    let app = test::init_service(App::new().app_data(get_app_data().await).service(signup)).await;
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
 
     let data = SignUpData {
         email: String::from("test"),
@@ -147,8 +175,7 @@ async fn test_signin() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(signup)
-            .service(signin),
+            .configure(main_config),
     )
     .await;
 
@@ -185,8 +212,7 @@ async fn test_signin_signup_tokens_not_eq() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(signup)
-            .service(signin),
+            .configure(main_config),
     )
     .await;
 
@@ -220,8 +246,7 @@ async fn test_logout() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(logout)
-            .service(signup),
+            .configure(main_config),
     )
     .await;
 
@@ -254,9 +279,7 @@ async fn test_logout_and_signin() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(logout)
-            .service(signin)
-            .service(signup),
+            .configure(main_config),
     )
     .await;
 
@@ -300,8 +323,7 @@ async fn test_logout_with_refresh() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(logout)
-            .service(signup),
+            .configure(main_config),
     )
     .await;
 
@@ -328,8 +350,7 @@ async fn test_logout_not_authorized() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(logout)
-            .service(signup),
+            .configure(main_config),
     )
     .await;
 
@@ -343,7 +364,7 @@ async fn test_logout_not_authorized() {
     assert!(signup_res.status().is_success());
 
     let logout_res = test::TestRequest::post()
-        .uri("/logout")
+        .uri("/api/auth/logout")
         .send_request(&app)
         .await;
     assert_eq!(logout_res.status(), StatusCode::UNAUTHORIZED)
@@ -354,8 +375,7 @@ async fn test_refresh_token() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(signup)
-            .service(refresh_token),
+            .configure(main_config),
     )
     .await;
 
@@ -404,8 +424,7 @@ async fn test_refresh_token_duplicated() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(signup)
-            .service(refresh_token),
+            .configure(main_config),
     )
     .await;
 
@@ -434,8 +453,7 @@ async fn test_refresh_tokens_with_access() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
-            .service(signup)
-            .service(refresh_token),
+            .configure(main_config),
     )
     .await;
 
