@@ -1,0 +1,28 @@
+-- Add up migration script here
+CREATE TYPE language AS ENUM (
+   'bg',
+   'cs',
+   'da',
+   'de',
+   'el',
+   'en',
+   'es',
+   'et',
+   'fi',
+   'fr',
+   'hu',
+   'it',
+   'ja',
+   'lt',
+   'lv',
+   'mt',
+   'nl',
+   'pl',
+   'pt',
+   'ro',
+   'ru',
+   'sk',
+   'sl',
+   'sv',
+   'zh'
+);
