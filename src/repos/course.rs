@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder};
 
 pub fn course_config(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -10,10 +10,16 @@ pub fn course_config(cfg: &mut web::ServiceConfig) {
 }
 
 #[post("/")]
-async fn create_course() -> impl Responder {}
+pub async fn create_course() -> impl Responder {
+    HttpResponse::NotImplemented()
+}
 
 #[get("/")]
-async fn get_courses() -> impl Responder {}
+pub async fn get_courses() -> impl Responder {
+    HttpResponse::NotImplemented()
+}
 
 #[get("/{id}")]
-async fn get_course() -> impl Responder {}
+pub async fn get_course() -> impl Responder {
+    HttpResponse::NotImplemented()
+}
