@@ -4,7 +4,7 @@ use actix_cors::Cors;
 use actix_web::{get, middleware::Logger, web, App, HttpResponse, HttpServer, Responder};
 use dotenvy::dotenv;
 use rc_api::{
-    get_app_data,
+    get_app_data, main_config,
     repos::{auth::auth_config, course::course_config},
 };
 
@@ -37,12 +37,7 @@ async fn main() -> std::io::Result<()> {
                     .max_age(3600),
             )
             .app_data(state.clone())
-            .service(
-                web::scope("/api")
-                    .service(index)
-                    .configure(auth_config)
-                    .configure(course_config),
-            )
+            .configure(main_config)
     })
     .bind(addrs)?
     .run()

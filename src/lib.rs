@@ -11,6 +11,7 @@ use std::env;
 use actix_web::web;
 use dotenvy::dotenv;
 use jwt_simple::algorithms::HS256Key;
+use repos::{auth::auth_config, course::course_config};
 use sqlx::{Pool, Postgres};
 use utils::jwt::JwtUtil;
 
@@ -42,4 +43,12 @@ pub async fn get_app_data() -> web::Data<AppState> {
         pool,
         jwt: JwtUtil { key },
     })
+}
+
+pub fn main_config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/api")
+            .configure(auth_config)
+            .configure(course_config),
+    );
 }
