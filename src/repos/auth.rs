@@ -10,7 +10,7 @@ use crate::{
         common::ErrorResponse,
         user::CreateUser,
     },
-    services::{self, user::update_user_refresh_hash},
+    services::user::{create_user, find_user_by_email, find_user_by_id},
     utils::jwt::scopes,
     AppState,
 };
@@ -38,7 +38,7 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
         refresh_token_hash: None,
     };
 
-    let new_id = match services::user::create_user(&user, &app_data.pool).await {
+    let new_id = match create_user(&user, &app_data.pool).await {
         Ok(res) => res,
         Err(_) => {
             return HttpResponse::Conflict().json(ErrorResponse {
@@ -69,7 +69,8 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
         )
         .unwrap();
 
-    services::user::update_user_refresh_hash(new_id, Some(&refresh), &app_data.pool)
+    let user = find_user_by_id(new_id, &app_data.pool).await.unwrap();
+    user.update_refresh_token(Some(&refresh), &app_data.pool)
         .await
         .expect("failed update user refresh hash");
 
@@ -80,7 +81,7 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
 pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) -> impl Responder {
     let jwt = &app_data.jwt;
 
-    let user = services::user::find_user_by_email(&data.email, &app_data.pool).await;
+    let user = find_user_by_email(&data.email, &app_data.pool).await;
 
     let user = match user {
         Ok(user) => user,
@@ -119,7 +120,7 @@ pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) 
         )
         .unwrap();
 
-    services::user::update_user_refresh_hash(user.id, Some(&refresh), &app_data.pool)
+    user.update_refresh_token(Some(&refresh), &app_data.pool)
         .await
         .expect("failed update user refresh hash");
 
@@ -128,11 +129,12 @@ pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) 
 
 #[post("/logout")]
 pub async fn logout(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
-    if let Err(_) = services::user::find_user_by_id(creds.uid, &app_data.pool).await {
-        return HttpResponse::NotFound();
-    }
+    let user = match find_user_by_id(creds.uid, &app_data.pool).await {
+        Ok(user) => user,
+        Err(_) => return HttpResponse::NotFound(),
+    };
 
-    update_user_refresh_hash(creds.uid, None, &app_data.pool)
+    user.update_refresh_token(None, &app_data.pool)
         .await
         .unwrap();
 
@@ -168,7 +170,7 @@ pub async fn refresh_token(req: HttpRequest, app_data: web::Data<AppState>) -> i
         },
     };
 
-    let user = match services::user::find_user_by_id(claims.uid, &app_data.pool).await {
+    let user = match find_user_by_id(claims.uid, &app_data.pool).await {
         Ok(user) => user,
         Err(_) => {
             return HttpResponse::NotFound().json(ErrorResponse {
@@ -187,7 +189,7 @@ pub async fn refresh_token(req: HttpRequest, app_data: web::Data<AppState>) -> i
         });
     }
 
-    if user.refresh_token_hash.unwrap().as_str() != hashed_refresh.as_str() {
+    if user.refresh_token_hash.clone().unwrap().as_str() != hashed_refresh.as_str() {
         return HttpResponse::Unauthorized().json(ErrorResponse {
             message: String::from("token are invalid"),
         });
@@ -214,7 +216,7 @@ pub async fn refresh_token(req: HttpRequest, app_data: web::Data<AppState>) -> i
         )
         .unwrap();
 
-    services::user::update_user_refresh_hash(user.id, Some(&refresh), &app_data.pool)
+    user.update_refresh_token(Some(&refresh), &app_data.pool)
         .await
         .unwrap();
 

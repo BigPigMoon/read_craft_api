@@ -38,27 +38,29 @@ pub async fn find_user_by_email(
     Ok(user)
 }
 
-pub async fn update_user_refresh_hash(
-    id: i32,
-    token: Option<&str>,
-    pool: &sqlx::Pool<Postgres>,
-) -> Result<(), Box<dyn Error>> {
-    let token = match token {
-        Some(token) => {
-            let mut hasher = Sha256::new();
-            hasher.input_str(token);
-            Some(hasher.result_str())
-        }
-        None => None,
-    };
+impl User {
+    pub async fn update_refresh_token(
+        &self,
+        token: Option<&str>,
+        pool: &sqlx::Pool<Postgres>,
+    ) -> Result<(), Box<dyn Error>> {
+        let token = match token {
+            Some(token) => {
+                let mut hasher = Sha256::new();
+                hasher.input_str(token);
+                Some(hasher.result_str())
+            }
+            None => None,
+        };
 
-    sqlx::query!(
-        "UPDATE users SET refresh_token_hash=$2 WHERE id=$1",
-        id,
-        token
-    )
-    .execute(pool)
-    .await?;
+        sqlx::query!(
+            "UPDATE users SET refresh_token_hash=$2 WHERE id=$1",
+            self.id,
+            token
+        )
+        .execute(pool)
+        .await?;
 
-    Ok(())
+        Ok(())
+    }
 }
