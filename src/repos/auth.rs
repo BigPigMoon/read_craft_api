@@ -16,7 +16,13 @@ use crate::{
 };
 
 pub fn auth_config(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/auth").service(signup));
+    cfg.service(
+        web::scope("/auth")
+            .service(signup)
+            .service(signin)
+            .service(logout)
+            .service(refresh_token),
+    );
 }
 
 #[post("/signup")]
