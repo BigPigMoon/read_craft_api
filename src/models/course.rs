@@ -1,7 +1,8 @@
 use super::language::Language;
 use chrono::NaiveDateTime;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Course {
     pub id: i32,
     pub created_at: NaiveDateTime,
@@ -10,7 +11,7 @@ pub struct Course {
     pub language: Language,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CreateCourse {
     pub title: String,
     pub language: Language,
