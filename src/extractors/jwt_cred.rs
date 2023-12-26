@@ -31,7 +31,11 @@ impl FromRequest for JwtCred {
 
                 match jwt_controller.get_claims(&token.as_str(), scopes::ACCESS) {
                     Some(claims) => return ready(Ok(claims)),
-                    None => return ready(Err(error::ErrorBadRequest("invalid token format"))),
+                    None => {
+                        return ready(Err(error::ErrorUnauthorized(
+                            "authorization header is missing",
+                        )))
+                    }
                 }
             }
             Err(err) => match err {
@@ -53,10 +57,10 @@ pub fn get_token_from_req(req: HttpRequest) -> Result<String, AuthError> {
                 if let Some(token) = token_str.split(' ').last() {
                     Ok(token.to_string())
                 } else {
-                    Err(AuthError::InvalidToken)
+                    Err(AuthError::Unauthorized)
                 }
             } else {
-                Err(AuthError::InvalidToken)
+                Err(AuthError::Unauthorized)
             }
         }
         None => Err(AuthError::Unauthorized),
