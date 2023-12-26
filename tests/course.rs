@@ -67,16 +67,16 @@ fn signup_req(data: SignUpData) -> test::TestRequest {
         .set_json(data)
 }
 
-lazy_static! {
-    static ref IVAN: (i32, String) = task::block_in_place(|| tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(async { init_jwt().await }));
-    static ref ANTON: (i32, String) = task::block_in_place(|| tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(async { init_jwt().await }));
-}
+// lazy_static! {
+//     static ref IVAN: (i32, String) = task::block_in_place(|| tokio::runtime::Runtime::new()
+//         .unwrap()
+//         .block_on(async { init_jwt().await }));
+//     static ref ANTON: (i32, String) = task::block_in_place(|| tokio::runtime::Runtime::new()
+//         .unwrap()
+//         .block_on(async { init_jwt().await }));
+// }
 
-async fn init_jwt() -> (i32, String) {
+async fn init_user() -> (i32, String) {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
@@ -112,12 +112,14 @@ async fn test_create_course_success() {
     let title: String = Title(EN).fake();
     let lang = Language::En;
 
+    let user = init_user().await;
+
     let create_course_res = create_course_req(
         CreateCourse {
             title,
             language: lang,
         },
-        IVAN.1.as_str(),
+        user.1.as_str(),
     )
     .send_request(&app)
     .await;
@@ -136,12 +138,14 @@ async fn test_create_course_badrequest() {
     )
     .await;
 
+    let user = init_user().await;
+
     let create_course_res = create_course_req(
         CreateCourse {
             title: "".to_string(),
             language: Language::De,
         },
-        IVAN.1.as_str(),
+        user.1.as_str(),
     )
     .send_request(&app)
     .await;
@@ -184,13 +188,15 @@ async fn test_get_course_success() {
     let lang = Language::En;
     let title: String = Title(EN).fake();
 
+    let user = init_user().await;
+
     // create the course
     let create_course_res = create_course_req(
         CreateCourse {
             title: title.clone(),
             language: lang.clone(),
         },
-        IVAN.1.as_str(),
+        user.1.as_str(),
     )
     .send_request(&app)
     .await;
@@ -202,7 +208,7 @@ async fn test_get_course_success() {
     let id: i32 = test::read_body_json(create_course_res).await;
 
     // send get course response
-    let get_course_res = get_course_req(id, IVAN.1.as_str()).send_request(&app).await;
+    let get_course_res = get_course_req(id, user.1.as_str()).send_request(&app).await;
 
     // assertion
     assert_eq!(get_course_res.status(), StatusCode::OK);
@@ -222,9 +228,11 @@ async fn test_get_course_notfound() {
     )
     .await;
 
+    let user = init_user().await;
+
     let id = i32::MAX - 2;
 
-    let get_course_res = get_course_req(id, IVAN.1.as_str()).send_request(&app).await;
+    let get_course_res = get_course_req(id, user.1.as_str()).send_request(&app).await;
 
     assert_eq!(get_course_res.status(), StatusCode::NOT_FOUND);
 }
@@ -252,7 +260,9 @@ async fn test_get_all_courses() {
     )
     .await;
 
-    let get_courses_res = get_courses_req(IVAN.1.as_str()).send_request(&app).await;
+    let user = init_user().await;
+
+    let get_courses_res = get_courses_req(user.1.as_str()).send_request(&app).await;
 
     assert_eq!(get_courses_res.status(), StatusCode::OK);
 
@@ -284,12 +294,14 @@ async fn test_user_is_owner_yes() {
     )
     .await;
 
+    let user = init_user().await;
+
     let new_course = create_course_req(
         CreateCourse {
             title: Title(EN).fake(),
             language: Language::En,
         },
-        IVAN.1.as_str(),
+        user.1.as_str(),
     )
     .send_request(&app)
     .await;
@@ -298,7 +310,7 @@ async fn test_user_is_owner_yes() {
 
     let new_course_id = test::read_body_json(new_course).await;
 
-    let user_is_owner_res = user_is_owner_req(new_course_id, IVAN.1.as_str())
+    let user_is_owner_res = user_is_owner_req(new_course_id, user.1.as_str())
         .send_request(&app)
         .await;
 
@@ -318,12 +330,15 @@ async fn test_user_is_owner_no() {
     )
     .await;
 
+    let user1 = init_user().await;
+    let user2 = init_user().await;
+
     let new_course = create_course_req(
         CreateCourse {
             title: Title(EN).fake(),
             language: Language::En,
         },
-        IVAN.1.as_str(),
+        user1.1.as_str(),
     )
     .send_request(&app)
     .await;
@@ -332,7 +347,7 @@ async fn test_user_is_owner_no() {
 
     let new_course_id = test::read_body_json(new_course).await;
 
-    let user_is_owner_res = user_is_owner_req(new_course_id, ANTON.1.as_str())
+    let user_is_owner_res = user_is_owner_req(new_course_id, user2.1.as_str())
         .send_request(&app)
         .await;
 
@@ -352,9 +367,11 @@ async fn test_user_is_owner_notfound() {
     )
     .await;
 
+    let user = init_user().await;
+
     let course_id = i32::MAX;
 
-    let user_is_owner_res = user_is_owner_req(course_id, IVAN.1.as_str())
+    let user_is_owner_res = user_is_owner_req(course_id, user.1.as_str())
         .send_request(&app)
         .await;
 
@@ -370,12 +387,14 @@ async fn test_user_is_owner_is_private() {
     )
     .await;
 
+    let user = init_user().await;
+
     let new_course = create_course_req(
         CreateCourse {
             title: Title(EN).fake(),
             language: Language::En,
         },
-        IVAN.1.as_str(),
+        user.1.as_str(),
     )
     .send_request(&app)
     .await;
@@ -400,12 +419,15 @@ async fn test_subscribe() {
     )
     .await;
 
+    let user1 = init_user().await;
+    let user2 = init_user().await;
+
     let new_course = create_course_req(
         CreateCourse {
             title: Title(EN).fake(),
             language: Language::En,
         },
-        IVAN.1.as_str(),
+        user1.1.as_str(),
     )
     .send_request(&app)
     .await;
@@ -414,7 +436,7 @@ async fn test_subscribe() {
 
     let new_course_id = test::read_body_json(new_course).await;
 
-    let subscribe_res = subscribe_to_course_req(new_course_id, ANTON.1.as_str())
+    let subscribe_res = subscribe_to_course_req(new_course_id, user2.1.as_str())
         .send_request(&app)
         .await;
 
@@ -425,7 +447,7 @@ async fn test_subscribe() {
     let select = sqlx::query!(
         "SELECT * FROM course_user WHERE course_id=$1 AND user_id=$2;",
         new_course_id,
-        ANTON.0
+        user2.0
     )
     .fetch_optional(pool)
     .await
@@ -443,9 +465,11 @@ async fn test_subscribe_notfound() {
     )
     .await;
 
+    let user = init_user().await;
+
     let course_id = i32::MAX;
 
-    let subscribe_res = subscribe_to_course_req(course_id, ANTON.1.as_str())
+    let subscribe_res = subscribe_to_course_req(course_id, user.1.as_str())
         .send_request(&app)
         .await;
 
@@ -461,12 +485,14 @@ async fn test_subscribe_is_private() {
     )
     .await;
 
+    let user = init_user().await;
+
     let new_course = create_course_req(
         CreateCourse {
             title: Title(EN).fake(),
             language: Language::En,
         },
-        IVAN.1.as_str(),
+        user.1.as_str(),
     )
     .send_request(&app)
     .await;
@@ -491,7 +517,9 @@ async fn test_get_subscribed() {
     )
     .await;
 
-    let subs_res = get_subs_course_req(IVAN.1.as_str())
+    let user = init_user().await;
+
+    let subs_res = get_subs_course_req(user.1.as_str())
         .send_request(&app)
         .await;
 
