@@ -1,12 +1,9 @@
 use std::env;
 
 use actix_cors::Cors;
-use actix_web::{get, middleware::Logger, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, middleware::Logger, App, HttpResponse, HttpServer, Responder};
 use dotenvy::dotenv;
-use rc_api::{
-    get_app_data, main_config,
-    repos::{auth::auth_config, course::course_config},
-};
+use rc_api::{get_app_data, main_config};
 
 #[get("/")]
 async fn index() -> impl Responder {

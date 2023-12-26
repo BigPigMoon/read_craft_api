@@ -6,7 +6,14 @@ edition = "2021"
 [dependencies]
 actix-cors = "0.6.5"
 actix-web = "4"
-sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "time", "chrono", "macros"] }
+actix-http = "3.4.0"
+sqlx = { version = "0.7", features = [
+    "runtime-tokio",
+    "postgres",
+    "time",
+    "chrono",
+    "macros",
+] }
 tokio = { version = "1.34", features = ["full"] }
 env_logger = "0.10.1"
 log = "0.4.20"
@@ -17,7 +24,8 @@ bcrypt = "0.15.0"
 validator = { version = "0.16", features = ["derive"] }
 rust-crypto = "^0.2"
 futures-util = "0.3"
-chrono = "0.4.31"
+chrono = { version = "0.4.31", features = ["serde"] }
 
 [dev-dependencies]
 fake = { version = "2.9.1", features = ["derive"] }
+lazy_static = "1.4.0"
