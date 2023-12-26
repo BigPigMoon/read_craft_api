@@ -27,6 +27,7 @@ pub fn auth_config(cfg: &mut web::ServiceConfig) {
 
 #[post("/signup")]
 pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) -> impl Responder {
+    // TODO: loggin this funciton!
     let jwt_controller = &app_data.jwt;
 
     if data.validate().is_err() {
@@ -85,6 +86,7 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
 
 #[post("/signin")]
 pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) -> impl Responder {
+    // TODO: loggin this funciton!
     let jwt = &app_data.jwt;
 
     let user = find_user_by_email(&data.email, &app_data.pool).await;
@@ -135,6 +137,7 @@ pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) 
 
 #[post("/logout")]
 pub async fn logout(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
+    // TODO: loggin this funciton!
     let user = match find_user_by_id(creds.uid, &app_data.pool).await {
         Ok(user) => user,
         Err(_) => return HttpResponse::NotFound(),
@@ -149,6 +152,7 @@ pub async fn logout(creds: JwtCred, app_data: web::Data<AppState>) -> impl Respo
 
 #[post("/refresh")]
 pub async fn refresh_token(req: HttpRequest, app_data: web::Data<AppState>) -> impl Responder {
+    // TODO: loggin this funciton!
     let jwt = &app_data.jwt;
 
     let token = get_token_from_req(req);
