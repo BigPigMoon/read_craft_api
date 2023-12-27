@@ -342,7 +342,7 @@ async fn test_logout_with_refresh() {
     let tokens: Tokens = test::call_and_read_body_json(&app, signup_req).await;
 
     let logout_res = logout_req(&tokens.refresh).send_request(&app).await;
-    assert_eq!(logout_res.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(logout_res.status(), StatusCode::UNAUTHORIZED);
 }
 
 #[actix_web::test]
