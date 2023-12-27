@@ -15,10 +15,12 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
     let host = env::var("HOST").expect("HOST is not set in .env file");
-    let port = env::var("PORT").expect("HOST is not set in .env file");
+    let port = env::var("PORT").expect("PORT is not set in .env file");
     let addrs = format!("{}:{}", host, port);
 
     let state = get_app_data().await;
+
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
     log::info!("starting HTTP server at http://{}", addrs);
 

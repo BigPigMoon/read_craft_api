@@ -4,6 +4,8 @@ use std::error::Error;
 
 use crate::models::user::{CreateUser, User};
 
+// TODO: document all fucntion here
+
 pub async fn create_user(
     user: &CreateUser,
     pool: &sqlx::Pool<Postgres>,

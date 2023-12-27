@@ -10,7 +10,6 @@ use fake::{
     locales::EN,
     Fake,
 };
-use lazy_static::lazy_static;
 use rc_api::{
     get_app_data, get_db_conn, get_key, main_config,
     models::{
@@ -20,7 +19,6 @@ use rc_api::{
     },
     utils::jwt::{scopes, JwtUtil},
 };
-use tokio::task;
 
 fn create_course_req(course: CreateCourse, token: &str) -> test::TestRequest {
     test::TestRequest::post()
@@ -43,11 +41,11 @@ fn get_course_req(course_id: i32, token: &str) -> test::TestRequest {
 
 fn get_subs_course_req(token: &str) -> test::TestRequest {
     test::TestRequest::get()
-        .uri("/api/course/subscribe")
+        .uri("/api/course/subscribe/")
         .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
 }
 
-/// Send reqeust to **/api/course/subs/{id}**
+/// Send reqeust to **/api/course/subscribe/{id}**
 fn subscribe_to_course_req(course_id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::post()
         .uri(format!("/api/course/subscribe/{course_id}").as_str())
@@ -346,6 +344,12 @@ async fn test_user_is_owner_no() {
     assert!(new_course.status().is_success());
 
     let new_course_id = test::read_body_json(new_course).await;
+
+    let sub_res = subscribe_to_course_req(new_course_id, user2.1.as_str())
+        .send_request(&app)
+        .await;
+
+    assert!(sub_res.status().is_success());
 
     let user_is_owner_res = user_is_owner_req(new_course_id, user2.1.as_str())
         .send_request(&app)

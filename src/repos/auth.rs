@@ -25,6 +25,8 @@ pub fn auth_config(cfg: &mut web::ServiceConfig) {
     );
 }
 
+// TODO: document all fucntion here
+
 #[post("/signup")]
 pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) -> impl Responder {
     // TODO: loggin this funciton!

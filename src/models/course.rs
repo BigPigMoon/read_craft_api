@@ -2,7 +2,7 @@ use super::language::Language;
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, sqlx::FromRow, Deserialize, Serialize)]
 pub struct Course {
     pub id: i32,
     pub created_at: NaiveDateTime,
