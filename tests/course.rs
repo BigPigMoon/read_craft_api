@@ -5,7 +5,7 @@ use actix_web::{
 use fake::{
     faker::{
         internet::raw::{FreeEmail, Password, Username},
-        name::raw::Title,
+        lorem::raw::Words,
     },
     locales::EN,
     Fake,
@@ -22,26 +22,26 @@ use rc_api::{
 
 fn create_course_req(course: CreateCourse, token: &str) -> test::TestRequest {
     test::TestRequest::post()
-        .uri("/api/course/")
+        .uri("/api/course/create")
         .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
         .set_json(course)
 }
 
 fn get_courses_req(token: &str) -> test::TestRequest {
     test::TestRequest::get()
-        .uri("/api/course/")
+        .uri("/api/course/all")
         .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
 }
 
 fn get_course_req(course_id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::get()
-        .uri(format!("/api/course/{course_id}").as_str())
+        .uri(format!("/api/course/get/{course_id}").as_str())
         .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
 }
 
 fn get_subs_course_req(token: &str) -> test::TestRequest {
     test::TestRequest::get()
-        .uri("/api/course/subscribe/")
+        .uri("/api/course/subscribe/all")
         .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
 }
 
@@ -107,7 +107,8 @@ async fn test_create_course_success() {
     )
     .await;
 
-    let title: String = Title(EN).fake();
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
     let lang = Language::En;
 
     let user = init_user().await;
@@ -160,9 +161,12 @@ async fn test_create_course_is_private() {
     )
     .await;
 
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+
     let create_course_res = create_course_req(
         CreateCourse {
-            title: Title(EN).fake(),
+            title,
             language: Language::En,
         },
         "wron data",
@@ -184,7 +188,8 @@ async fn test_get_course_success() {
 
     // init vars
     let lang = Language::En;
-    let title: String = Title(EN).fake();
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
 
     let user = init_user().await;
 
@@ -294,9 +299,12 @@ async fn test_user_is_owner_yes() {
 
     let user = init_user().await;
 
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+
     let new_course = create_course_req(
         CreateCourse {
-            title: Title(EN).fake(),
+            title,
             language: Language::En,
         },
         user.1.as_str(),
@@ -331,9 +339,12 @@ async fn test_user_is_owner_no() {
     let user1 = init_user().await;
     let user2 = init_user().await;
 
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+
     let new_course = create_course_req(
         CreateCourse {
-            title: Title(EN).fake(),
+            title,
             language: Language::En,
         },
         user1.1.as_str(),
@@ -393,9 +404,12 @@ async fn test_user_is_owner_is_private() {
 
     let user = init_user().await;
 
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+
     let new_course = create_course_req(
         CreateCourse {
-            title: Title(EN).fake(),
+            title,
             language: Language::En,
         },
         user.1.as_str(),
@@ -426,9 +440,12 @@ async fn test_subscribe() {
     let user1 = init_user().await;
     let user2 = init_user().await;
 
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+
     let new_course = create_course_req(
         CreateCourse {
-            title: Title(EN).fake(),
+            title,
             language: Language::En,
         },
         user1.1.as_str(),
@@ -491,9 +508,12 @@ async fn test_subscribe_is_private() {
 
     let user = init_user().await;
 
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+
     let new_course = create_course_req(
         CreateCourse {
-            title: Title(EN).fake(),
+            title,
             language: Language::En,
         },
         user.1.as_str(),
