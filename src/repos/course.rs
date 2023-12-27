@@ -23,7 +23,7 @@ pub fn course_config(cfg: &mut web::ServiceConfig) {
 }
 
 /// create course with CreateCourse model
-#[post("/")]
+#[post("/create")]
 pub async fn create_course(
     creds: JwtCred,
     course: web::Json<CreateCourse>,
@@ -61,7 +61,7 @@ pub async fn create_course(
 }
 
 /// get all courses
-#[get("/")]
+#[get("/all")]
 pub async fn get_courses(_: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
     let op = "get_courses";
 
@@ -86,7 +86,7 @@ pub async fn get_courses(_: JwtCred, app_data: web::Data<AppState>) -> impl Resp
 }
 
 /// get course by id
-#[get("/{id}")]
+#[get("/get/{id}")]
 pub async fn get_course(
     _: JwtCred,
     path: web::Path<i32>,
@@ -122,7 +122,7 @@ pub async fn get_course(
 }
 
 /// get all courses to which the user is subscribed
-#[get("/subscribe/")]
+#[get("/subscribe/all")]
 pub async fn get_subs(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
     let op = "get_subs";
 
