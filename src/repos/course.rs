@@ -23,7 +23,8 @@ pub fn course_config(cfg: &mut web::ServiceConfig) {
     );
 }
 
-/// create course with CreateCourse model
+/// Create course request
+/// Create course with CreateCourse model
 #[post("/create")]
 pub async fn create_course(
     creds: JwtCred,
@@ -68,7 +69,7 @@ pub async fn create_course(
     HttpResponse::Created().json(new_course_id)
 }
 
-/// get all courses
+/// Get all courses request
 #[get("/all")]
 pub async fn get_courses(_: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
     let op = "get_courses";
@@ -94,7 +95,7 @@ pub async fn get_courses(_: JwtCred, app_data: web::Data<AppState>) -> impl Resp
     HttpResponse::Ok().json(courses)
 }
 
-/// get course by id
+/// Get course by id request
 #[get("/get/{id}")]
 pub async fn get_course(
     _: JwtCred,
@@ -136,7 +137,7 @@ pub async fn get_course(
     HttpResponse::Ok().json(course)
 }
 
-/// get all courses to which the user is subscribed
+/// Get all courses to which the user is subscribed request
 #[get("/subscribe/all")]
 pub async fn get_subs(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
     let op = "get_subs";
@@ -167,7 +168,7 @@ pub async fn get_subs(creds: JwtCred, app_data: web::Data<AppState>) -> impl Res
     HttpResponse::Ok().json(courses)
 }
 
-/// subscribes the user to the course
+/// Subscribes the user to the course request
 #[post("/subscribe/{id}")]
 pub async fn subscribe(
     creds: JwtCred,
@@ -218,7 +219,7 @@ pub async fn subscribe(
     HttpResponse::Ok()
 }
 
-/// return true if user are owner of course
+/// Return true if user are owner of course request
 #[get("/owner/{id}")]
 pub async fn is_owner(
     creds: JwtCred,
