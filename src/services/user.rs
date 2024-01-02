@@ -4,8 +4,7 @@ use std::error::Error;
 
 use crate::models::user::{CreateUser, User};
 
-// TODO: document all fucntion here
-
+/// create user function in database
 pub async fn create_user(
     user: &CreateUser,
     pool: &sqlx::Pool<Postgres>,
@@ -21,6 +20,7 @@ pub async fn create_user(
     Ok(id)
 }
 
+/// find user by id
 pub async fn find_user_by_id(id: i32, pool: &sqlx::Pool<Postgres>) -> Result<User, Box<dyn Error>> {
     let user = sqlx::query_as!(User, "SELECT * FROM users WHERE id=$1", id)
         .fetch_one(pool)
@@ -29,6 +29,7 @@ pub async fn find_user_by_id(id: i32, pool: &sqlx::Pool<Postgres>) -> Result<Use
     Ok(user)
 }
 
+/// find user by email
 pub async fn find_user_by_email(
     email: &str,
     pool: &sqlx::Pool<Postgres>,
@@ -41,6 +42,7 @@ pub async fn find_user_by_email(
 }
 
 impl User {
+    /// update refresh token for user
     pub async fn update_refresh_token(
         &self,
         token: Option<&str>,
