@@ -8,6 +8,7 @@ use crate::services::course::{
     create_course_db, find_course_by_id, get_courses_db, get_subscribed, subscribe_to_course,
     user_is_owner,
 };
+use crate::services::user::find_user_by_id;
 use crate::AppState;
 
 pub fn course_config(cfg: &mut web::ServiceConfig) {
@@ -44,10 +45,17 @@ pub async fn create_course(
 
     let new_course_id = match create_course_db(creds.uid, &course, &app_data.pool).await {
         Ok(id) => id,
-        Err(_) => {
+        Err(err) => {
+            log::error!(
+                "{}: can't create new course, error: {}, title: {}, language: {:?}",
+                op,
+                err,
+                course.title,
+                course.language
+            );
             return HttpResponse::BadRequest().json(ErrorResponse {
                 message: String::from("invalid data"),
-            })
+            });
         }
     };
 
@@ -69,10 +77,11 @@ pub async fn get_courses(_: JwtCred, app_data: web::Data<AppState>) -> impl Resp
 
     let courses = match get_courses_db(&app_data.pool).await {
         Ok(courses) => courses,
-        Err(_) => {
+        Err(err) => {
+            log::error!("{}: couldn't get all courses, error: {}", op, err);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 message: "can't get all courses".to_string(),
-            })
+            });
         }
     };
 
@@ -103,10 +112,16 @@ pub async fn get_course(
 
     let course = match find_course_by_id(&course_id, &app_data.pool).await {
         Ok(course) => course,
-        Err(_) => {
+        Err(err) => {
+            log::error!(
+                "{}: course by id: {} is not exist, error: {}",
+                op,
+                course_id,
+                err
+            );
             return HttpResponse::NotFound().json(ErrorResponse {
                 message: "course by id is not exist".to_string(),
-            })
+            });
         }
     };
 
@@ -130,10 +145,16 @@ pub async fn get_subs(creds: JwtCred, app_data: web::Data<AppState>) -> impl Res
 
     let courses = match get_subscribed(creds.uid, &app_data.pool).await {
         Ok(courses) => courses,
-        Err(_) => {
+        Err(err) => {
+            log::error!(
+                "{}: error with get all courses in subscribtion, error: {}",
+                op,
+                err
+            );
+
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 message: "can't get subscribed courses".to_string(),
-            })
+            });
         }
     };
 
@@ -164,9 +185,27 @@ pub async fn subscribe(
         course_id
     );
 
-    match subscribe_to_course(creds.uid, course_id, &app_data.pool).await {
-        Ok(_) => {}
-        Err(_) => return HttpResponse::NotFound(),
+    if let Err(err) = find_user_by_id(course_id, &app_data.pool).await {
+        log::error!(
+            "{}: course not found, error: {}, course_id: {}",
+            op,
+            err,
+            course_id
+        );
+
+        return HttpResponse::NotFound();
+    }
+
+    if let Err(err) = subscribe_to_course(creds.uid, course_id, &app_data.pool).await {
+        log::error!(
+            "{}: error with subscribe to course, error: {}, course_id: {}, user_id: {}",
+            op,
+            err,
+            course_id,
+            creds.uid
+        );
+
+        return HttpResponse::InternalServerError();
     };
 
     log::info!(
@@ -199,8 +238,13 @@ pub async fn is_owner(
 
     let ownered = match user_is_owner(creds.uid, course_id, &app_data.pool).await {
         Ok(ownered) => ownered,
-        Err(_) => {
-            log::info!("{}: course by id: {} is not exist", op, course_id);
+        Err(err) => {
+            log::error!(
+                "{}: course by id: {} is not exist, error: {}",
+                op,
+                course_id,
+                err
+            );
             return HttpResponse::NotFound().json(ErrorResponse {
                 message: "course by id is not exist".to_string(),
             });
