@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) UNIQUE NOT NULL,
   username VARCHAR(100) NOT NULL,
   password_hash VARCHAR(100) NOT NULL,
-  refresh_token_hash TEXT
+  refresh_token_hash TEXT -- TODO: change text to varchar
 );
