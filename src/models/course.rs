@@ -16,3 +16,10 @@ pub struct CreateCourse {
     pub title: String,
     pub language: Language,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdateCourse {
+    pub id: i32,
+    pub title: String,
+    pub language: Language,
+}
