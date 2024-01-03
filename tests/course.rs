@@ -14,7 +14,7 @@ use rc_api::{
     get_app_data, get_db_conn, get_key, main_config,
     models::{
         auth::{SignUpData, Tokens},
-        course::{Course, CreateCourse},
+        course::{Course, CreateCourse, UpdateCourse},
         language::Language,
     },
     utils::jwt::{scopes, JwtUtil},
@@ -23,40 +23,60 @@ use rc_api::{
 fn create_course_req(course: CreateCourse, token: &str) -> test::TestRequest {
     test::TestRequest::post()
         .uri("/api/course/create")
-        .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
         .set_json(course)
 }
 
 fn get_courses_req(token: &str) -> test::TestRequest {
     test::TestRequest::get()
         .uri("/api/course/all")
-        .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
 fn get_course_req(course_id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::get()
         .uri(format!("/api/course/get/{course_id}").as_str())
-        .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
+}
+
+fn delete_course_req(id: i32, token: &str) -> test::TestRequest {
+    test::TestRequest::delete()
+        .uri(format!("/api/course/delete/{id}").as_str())
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
+}
+
+fn update_course_req(new_course: UpdateCourse, token: &str) -> test::TestRequest {
+    test::TestRequest::put()
+        .uri(format!("/api/course/update").as_str())
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
+        .set_json(new_course)
 }
 
 fn get_subs_course_req(token: &str) -> test::TestRequest {
     test::TestRequest::get()
         .uri("/api/course/subscribe/all")
-        .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
 /// Send reqeust to **/api/course/subscribe/{id}**
 fn subscribe_to_course_req(course_id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::post()
         .uri(format!("/api/course/subscribe/{course_id}").as_str())
-        .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
+}
+
+/// Send reqeust to **/api/course/unsubscribe/{id}**
+fn unsubscribe_to_course_req(course_id: i32, token: &str) -> test::TestRequest {
+    test::TestRequest::post()
+        .uri(format!("/api/course/unsubscribe/{course_id}").as_str())
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
 /// Send reqeust to **/api/course/owner/{id}**
 fn user_is_owner_req(course_id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::get()
         .uri(format!("/api/course/owner/{course_id}").as_str())
-        .append_header((header::AUTHORIZATION, format!("Bearer {}", token)))
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
 fn signup_req(data: SignUpData) -> test::TestRequest {
@@ -64,15 +84,6 @@ fn signup_req(data: SignUpData) -> test::TestRequest {
         .uri("/api/auth/signup")
         .set_json(data)
 }
-
-// lazy_static! {
-//     static ref IVAN: (i32, String) = task::block_in_place(|| tokio::runtime::Runtime::new()
-//         .unwrap()
-//         .block_on(async { init_jwt().await }));
-//     static ref ANTON: (i32, String) = task::block_in_place(|| tokio::runtime::Runtime::new()
-//         .unwrap()
-//         .block_on(async { init_jwt().await }));
-// }
 
 async fn init_user() -> (i32, String) {
     let app = test::init_service(
@@ -129,7 +140,7 @@ async fn test_create_course_success() {
 }
 
 #[actix_web::test]
-async fn test_create_course_badrequest() {
+async fn test_create_course_bad_request() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
@@ -223,7 +234,7 @@ async fn test_get_course_success() {
 }
 
 #[actix_web::test]
-async fn test_get_course_notfound() {
+async fn test_get_course_not_found() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
@@ -374,7 +385,7 @@ async fn test_user_is_owner_no() {
 }
 
 #[actix_web::test]
-async fn test_user_is_owner_notfound() {
+async fn test_user_is_owner_not_found() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
@@ -478,7 +489,91 @@ async fn test_subscribe() {
 }
 
 #[actix_web::test]
-async fn test_subscribe_notfound() {
+async fn test_unsubscribe_success() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user1 = init_user().await;
+    let user2 = init_user().await;
+
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+
+    let new_course = create_course_req(
+        CreateCourse {
+            title,
+            language: Language::En,
+        },
+        user1.1.as_str(),
+    )
+    .send_request(&app)
+    .await;
+
+    assert!(new_course.status().is_success());
+
+    let new_course_id = test::read_body_json(new_course).await;
+
+    let subscribe_res = subscribe_to_course_req(new_course_id, user2.1.as_str())
+        .send_request(&app)
+        .await;
+
+    assert!(subscribe_res.status().is_success());
+
+    let pool = &get_db_conn().await;
+
+    let select = sqlx::query!(
+        "SELECT * FROM course_user WHERE course_id=$1 AND user_id=$2;",
+        new_course_id,
+        user2.0
+    )
+    .fetch_optional(pool)
+    .await
+    .unwrap();
+
+    assert!(select.is_some());
+
+    let unsubscribe_res = unsubscribe_to_course_req(new_course_id, user2.1.as_str())
+        .send_request(&app)
+        .await;
+
+    assert!(unsubscribe_res.status().is_success());
+
+    let select = sqlx::query!(
+        "SELECT * FROM course_user WHERE course_id=$1 AND user_id=$2;",
+        new_course_id,
+        user2.0
+    )
+    .fetch_optional(pool)
+    .await
+    .unwrap();
+
+    assert!(select.is_none());
+}
+
+#[actix_web::test]
+async fn test_unsubscribe_not_found() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user2 = init_user().await;
+
+    let unsubscribe_res = unsubscribe_to_course_req(i32::MAX, user2.1.as_str())
+        .send_request(&app)
+        .await;
+
+    assert_eq!(unsubscribe_res.status(), StatusCode::NOT_FOUND);
+}
+
+#[actix_web::test]
+async fn test_subscribe_not_found() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
@@ -552,17 +647,6 @@ async fn test_get_subscribed() {
     let _: Vec<i32> = test::read_body_json(subs_res).await;
 }
 
-// new user has empty subs list
-// #[actix_web::test]
-// async fn test_get_subscribed_empty() {
-//     let app = test::init_service(
-//         App::new()
-//             .app_data(get_app_data().await)
-//             .configure(main_config),
-//     )
-//     .await;
-// }
-
 #[actix_web::test]
 async fn test_get_subscribed_is_private() {
     let app = test::init_service(
@@ -575,4 +659,201 @@ async fn test_get_subscribed_is_private() {
     let subs_res = get_subs_course_req("wrong data").send_request(&app).await;
 
     assert_eq!(subs_res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[actix_web::test]
+async fn test_update_course_success() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+    let lang = Language::En;
+
+    let create_course_res = create_course_req(
+        CreateCourse {
+            title,
+            language: lang,
+        },
+        user.1.as_str(),
+    )
+    .send_request(&app)
+    .await;
+
+    assert!(create_course_res.status().is_success());
+
+    let course_id: i32 = test::read_body_json(create_course_res).await;
+
+    let new_title: Vec<String> = Words(EN, 5..12).fake();
+    let new_title = new_title.join(" ");
+    let new_language = Language::De;
+
+    let update_course_res = update_course_req(
+        UpdateCourse {
+            id: course_id,
+            language: new_language,
+            title: new_title.clone(),
+        },
+        &user.1,
+    )
+    .send_request(&app)
+    .await;
+
+    assert_eq!(update_course_res.status(), StatusCode::OK);
+
+    let updated_course_id: i32 = test::read_body_json(update_course_res).await;
+
+    assert_eq!(updated_course_id, course_id);
+
+    let get_course_res = get_course_req(updated_course_id, &user.1)
+        .send_request(&app)
+        .await;
+
+    assert!(get_course_res.status().is_success());
+
+    let updated_course: Course = test::read_body_json(get_course_res).await;
+
+    assert_eq!(updated_course.title, new_title);
+    assert_eq!(updated_course.language, new_language);
+}
+
+#[actix_web::test]
+async fn test_update_course_not_found() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+    let course_id: i32 = i32::MAX;
+
+    let new_title: Vec<String> = Words(EN, 5..12).fake();
+    let new_title = new_title.join(" ");
+    let new_language = Language::De;
+
+    let update_course_res = update_course_req(
+        UpdateCourse {
+            id: course_id,
+            language: new_language,
+            title: new_title,
+        },
+        &user.1,
+    )
+    .send_request(&app)
+    .await;
+
+    assert_eq!(update_course_res.status(), StatusCode::NOT_FOUND);
+}
+
+#[actix_web::test]
+async fn test_update_course_bad_request() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+    let lang = Language::En;
+
+    let create_course_res = create_course_req(
+        CreateCourse {
+            title,
+            language: lang,
+        },
+        user.1.as_str(),
+    )
+    .send_request(&app)
+    .await;
+
+    assert!(create_course_res.status().is_success());
+
+    let course_id: i32 = test::read_body_json(create_course_res).await;
+
+    let new_title = "".to_string();
+    let new_language = Language::De;
+
+    let update_course_res = update_course_req(
+        UpdateCourse {
+            id: course_id,
+            language: new_language,
+            title: new_title,
+        },
+        &user.1,
+    )
+    .send_request(&app)
+    .await;
+
+    assert_eq!(update_course_res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[actix_web::test]
+async fn test_delete_course_success() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+    let lang = Language::En;
+
+    let create_course_res = create_course_req(
+        CreateCourse {
+            title,
+            language: lang,
+        },
+        user.1.as_str(),
+    )
+    .send_request(&app)
+    .await;
+
+    assert!(create_course_res.status().is_success());
+
+    let course_id: i32 = test::read_body_json(create_course_res).await;
+
+    let delete_course_res = delete_course_req(course_id, &user.1)
+        .send_request(&app)
+        .await;
+
+    assert_eq!(delete_course_res.status(), StatusCode::OK);
+
+    let get_course_res = get_course_req(course_id, &user.1).send_request(&app).await;
+
+    assert_eq!(get_course_res.status(), StatusCode::NOT_FOUND);
+}
+
+#[actix_web::test]
+async fn test_delete_course_not_found() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+    let course_id: i32 = i32::MAX;
+
+    let delete_course_res = delete_course_req(course_id, &user.1)
+        .send_request(&app)
+        .await;
+
+    assert_eq!(delete_course_res.status(), StatusCode::NOT_FOUND);
 }
