@@ -39,12 +39,14 @@ fn get_course_req(course_id: i32, token: &str) -> test::TestRequest {
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
+/// Send reqeust to **/api/course/delete/{id}**
 fn delete_course_req(id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::delete()
         .uri(format!("/api/course/delete/{id}").as_str())
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
+/// Send reqeust to **/api/course/update**
 fn update_course_req(new_course: UpdateCourse, token: &str) -> test::TestRequest {
     test::TestRequest::put()
         .uri(format!("/api/course/update").as_str())
@@ -52,6 +54,7 @@ fn update_course_req(new_course: UpdateCourse, token: &str) -> test::TestRequest
         .set_json(new_course)
 }
 
+/// Send reqeust to **/api/course/subscribe/all**
 fn get_subs_course_req(token: &str) -> test::TestRequest {
     test::TestRequest::get()
         .uri("/api/course/subscribe/all")
@@ -540,7 +543,7 @@ async fn test_unsubscribe_success() {
         .send_request(&app)
         .await;
 
-    assert!(unsubscribe_res.status().is_success());
+    assert_eq!(unsubscribe_res.status(), StatusCode::OK);
 
     let select = sqlx::query!(
         "SELECT * FROM course_user WHERE course_id=$1 AND user_id=$2;",
@@ -837,6 +840,43 @@ async fn test_delete_course_success() {
     let get_course_res = get_course_req(course_id, &user.1).send_request(&app).await;
 
     assert_eq!(get_course_res.status(), StatusCode::NOT_FOUND);
+}
+
+#[actix_web::test]
+async fn test_delete_course_forbidden() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user1 = init_user().await;
+    let user2 = init_user().await;
+
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+    let lang = Language::En;
+
+    let create_course_res = create_course_req(
+        CreateCourse {
+            title,
+            language: lang,
+        },
+        user1.1.as_str(),
+    )
+    .send_request(&app)
+    .await;
+
+    assert!(create_course_res.status().is_success());
+
+    let course_id: i32 = test::read_body_json(create_course_res).await;
+
+    let delete_course_res = delete_course_req(course_id, &user2.1)
+        .send_request(&app)
+        .await;
+
+    assert_eq!(delete_course_res.status(), StatusCode::FORBIDDEN);
 }
 
 #[actix_web::test]
