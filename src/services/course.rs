@@ -3,7 +3,7 @@ use std::error::Error;
 use sqlx::Postgres;
 
 use crate::models::{
-    course::{Course, CreateCourse},
+    course::{Course, CreateCourse, UpdateCourse},
     language::Language,
 };
 
@@ -56,6 +56,35 @@ pub async fn find_course_by_id(
     Ok(course)
 }
 
+/// Update course in database
+pub async fn update_course_db(
+    new_course: UpdateCourse,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<(), Box<dyn Error>> {
+    sqlx::query!(
+        "UPDATE courses SET title = $2, language = $3 WHERE id = $1",
+        new_course.id,
+        new_course.title,
+        new_course.language as Language
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Delete course in database by id
+pub async fn delete_course_db(
+    course_id: i32,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<(), Box<dyn Error>> {
+    sqlx::query!(r#"DELETE FROM courses WHERE id = $1"#, course_id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
 /// get all courses from database
 pub async fn get_courses_db(pool: &sqlx::Pool<Postgres>) -> Result<Vec<Course>, Box<dyn Error>> {
     let courses = sqlx::query_as!(
@@ -98,6 +127,23 @@ pub async fn subscribe_to_course(
     sqlx::query!(
         "INSERT INTO course_user(owned, course_id, user_id) VALUES($1, $2, $3)",
         false,
+        course_id,
+        user_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// user are unsubscribe to course
+pub async fn unsubscribe_to_course(
+    user_id: i32,
+    course_id: i32,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<(), Box<dyn Error>> {
+    sqlx::query!(
+        "DELETE FROM course_user WHERE course_id = $1 AND user_id = $2",
         course_id,
         user_id
     )

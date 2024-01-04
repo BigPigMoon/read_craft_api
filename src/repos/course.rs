@@ -1,14 +1,11 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use validator::Validate;
 
 use crate::extractors::jwt_cred::JwtCred;
 
 use crate::models::common::ErrorResponse;
-use crate::models::course::CreateCourse;
-use crate::services::course::{
-    create_course_db, find_course_by_id, get_courses_db, get_subscribed, subscribe_to_course,
-    user_is_owner,
-};
-use crate::services::user::find_user_by_id;
+use crate::models::course::{CreateCourse, UpdateCourse};
+use crate::services::course::*;
 use crate::AppState;
 
 pub fn course_config(cfg: &mut web::ServiceConfig) {
@@ -18,7 +15,10 @@ pub fn course_config(cfg: &mut web::ServiceConfig) {
             .service(get_course)
             .service(get_courses)
             .service(get_subs)
+            .service(delete_course)
+            .service(update_course)
             .service(subscribe)
+            .service(unsubscribe)
             .service(is_owner),
     );
 }
@@ -38,7 +38,9 @@ pub async fn create_course(
         course.title
     );
 
-    if course.title.is_empty() {
+    if course.validate().is_err() {
+        log::error!("{}: data is not validated, data: {:?}", op, course);
+
         return HttpResponse::BadRequest().json(ErrorResponse {
             message: String::from("title field is empty"),
         });
@@ -137,6 +139,124 @@ pub async fn get_course(
     HttpResponse::Ok().json(course)
 }
 
+/// Update course, get JSON with new data
+#[put("/update")]
+pub async fn update_course(
+    creds: JwtCred,
+    new_course: web::Json<UpdateCourse>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
+    let op = "update_course";
+
+    let user_id = creds.uid;
+    let course_id = new_course.id;
+
+    if new_course.validate().is_err() {
+        log::error!("{}: data is not validated, data: {:?}", op, new_course);
+
+        return HttpResponse::BadRequest().json(ErrorResponse {
+            message: String::from("title field is empty"),
+        });
+    }
+
+    if let Err(err) = find_course_by_id(&course_id, &app_data.pool).await {
+        log::warn!(
+            "{}: course by id: {} was not found, error: {}",
+            op,
+            course_id,
+            err
+        );
+
+        return HttpResponse::NotFound().json(ErrorResponse {
+            message: "course by id not founded".to_string(),
+        });
+    }
+
+    if !user_is_owner(user_id, course_id, &app_data.pool)
+        .await
+        .unwrap_or(false)
+    {
+        log::warn!(
+            "{}: user by id: {}, is not owner of course id: {}",
+            op,
+            user_id,
+            course_id
+        );
+
+        return HttpResponse::Forbidden().json(ErrorResponse {
+            message: "user is not owner of course".to_string(),
+        });
+    }
+
+    match update_course_db(new_course.0, &app_data.pool).await {
+        Ok(_) => {}
+        Err(err) => {
+            log::error!(
+                "{}: connon update course by id: {} of user_id: {}, error: {}",
+                op,
+                course_id,
+                user_id,
+                err
+            );
+
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                message: "cannot update course".to_string(),
+            });
+        }
+    }
+
+    HttpResponse::Ok().json(course_id)
+}
+
+/// Delete course by id
+#[delete("/delete/{id}")]
+pub async fn delete_course(
+    creds: JwtCred,
+    path: web::Path<i32>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
+    let op = "delete_course";
+
+    let course_id = path.into_inner();
+    let user_id = creds.uid;
+
+    if let Err(err) = find_course_by_id(&course_id, &app_data.pool).await {
+        log::warn!(
+            "{}: course by id: {} was not found, error: {}",
+            op,
+            course_id,
+            err
+        );
+
+        return HttpResponse::NotFound();
+    }
+
+    if !user_is_owner(user_id, course_id, &app_data.pool)
+        .await
+        .unwrap_or(false)
+    {
+        log::warn!(
+            "{}: user by id: {}, is not owner of course id: {}",
+            op,
+            user_id,
+            course_id
+        );
+
+        return HttpResponse::Forbidden();
+    }
+
+    match delete_course_db(course_id, &app_data.pool).await {
+        Ok(_) => {}
+        Err(err) => {
+            log::error!("{}: cannot delete course, error: {}", op, err);
+
+            return HttpResponse::InternalServerError();
+        }
+    }
+
+    HttpResponse::Ok()
+}
+
 /// Get all courses to which the user is subscribed request
 #[get("/subscribe/all")]
 pub async fn get_subs(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
@@ -186,7 +306,7 @@ pub async fn subscribe(
         course_id
     );
 
-    if let Err(err) = find_user_by_id(course_id, &app_data.pool).await {
+    if let Err(err) = find_course_by_id(&course_id, &app_data.pool).await {
         log::error!(
             "{}: course not found, error: {}, course_id: {}",
             op,
@@ -211,6 +331,56 @@ pub async fn subscribe(
 
     log::info!(
         "{}: user are successfuly subscribed, user_id: {}, course_id: {}",
+        op,
+        creds.uid,
+        course_id
+    );
+
+    HttpResponse::Ok()
+}
+
+#[post("/unsubscribe/{id}")]
+pub async fn unsubscribe(
+    creds: JwtCred,
+    path: web::Path<i32>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
+    let course_id = path.into_inner();
+
+    let op = "unsubscribe";
+
+    log::info!(
+        "{}: attempting to unsubscribe user on course, course_id: {}, user_id: {}",
+        op,
+        course_id,
+        creds.uid
+    );
+
+    if let Err(err) = find_course_by_id(&course_id, &app_data.pool).await {
+        log::error!(
+            "{}: course not found, error: {}, course_id: {}",
+            op,
+            err,
+            course_id
+        );
+
+        return HttpResponse::NotFound();
+    }
+
+    if let Err(err) = unsubscribe_to_course(creds.uid, course_id, &app_data.pool).await {
+        log::error!(
+            "{}: error with unsubscribe to course, error: {}, course_id: {}, user_id: {}",
+            op,
+            err,
+            course_id,
+            creds.uid
+        );
+
+        return HttpResponse::InternalServerError();
+    };
+
+    log::info!(
+        "{}: user are successfuly unsubscribed, user_id: {}, course_id: {}",
         op,
         creds.uid,
         course_id
