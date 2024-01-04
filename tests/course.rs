@@ -757,6 +757,54 @@ async fn test_update_course_not_found() {
 }
 
 #[actix_web::test]
+async fn test_update_course_forbidden() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user1 = init_user().await;
+    let user2 = init_user().await;
+
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title: String = title.join(" ");
+    let lang = Language::En;
+
+    let create_course_res = create_course_req(
+        CreateCourse {
+            title,
+            language: lang,
+        },
+        user1.1.as_str(),
+    )
+    .send_request(&app)
+    .await;
+
+    assert!(create_course_res.status().is_success());
+
+    let course_id: i32 = test::read_body_json(create_course_res).await;
+
+    let new_title: Vec<String> = Words(EN, 5..12).fake();
+    let new_title = new_title.join(" ");
+    let new_language = Language::De;
+
+    let update_course_res = update_course_req(
+        UpdateCourse {
+            id: course_id,
+            language: new_language,
+            title: new_title.clone(),
+        },
+        &user2.1,
+    )
+    .send_request(&app)
+    .await;
+
+    assert_eq!(update_course_res.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_web::test]
 async fn test_update_course_bad_request() {
     let app = test::init_service(
         App::new()
