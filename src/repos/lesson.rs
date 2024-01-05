@@ -1,4 +1,10 @@
+use std::{
+    env,
+    fs::{self, File},
+};
+
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use dotenvy::dotenv;
 use serde::Deserialize;
 use uuid::Uuid;
 use validator::Validate;
@@ -78,7 +84,17 @@ pub async fn create_lesson(
 
     let lesson_filename = Uuid::new_v4().to_string();
 
-    let new_course_id = match create_lesson_db(&lesson.0, &lesson_filename, &app_data.pool).await {
+    dotenv().ok();
+
+    let lessons_dir = env::var("LESSONS_DIR").unwrap_or("/lessons".to_string());
+
+    let new_course_id = match create_lesson_db(
+        &lesson.0,
+        &format!("{}/{}.md", lessons_dir, lesson_filename),
+        &app_data.pool,
+    )
+    .await
+    {
         Ok(id) => id,
         Err(err) => {
             log::error!(
