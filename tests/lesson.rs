@@ -21,6 +21,7 @@ use rc_api::{
     },
 };
 
+/// Send request to **/api/lesson/create**
 fn create_lesson_req(lesson: CreateLesson, token: &str) -> test::TestRequest {
     test::TestRequest::post()
         .uri("/api/lesson/create")
@@ -28,24 +29,28 @@ fn create_lesson_req(lesson: CreateLesson, token: &str) -> test::TestRequest {
         .set_json(lesson)
 }
 
+/// Send request to **/api/lesson/all**
 fn get_lessons_req(token: &str) -> test::TestRequest {
     test::TestRequest::get()
         .uri("/api/lesson/all")
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
+/// Send request to **/api/lesson/all?course={course_id}**
 fn get_lessons_in_course_req(course_id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::get()
         .uri(format!("/api/lesson/all?course={course_id}").as_str())
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
+/// Send request to **/api/lesson/get**
 fn get_lesson_req(id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::get()
         .uri(format!("/api/lesson/get/{id}").as_str())
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
+/// Send request to **/api/lesson/update**
 fn update_lesson_req(new_lesson: UpdateLesson, token: &str) -> test::TestRequest {
     test::TestRequest::put()
         .uri("/api/lesson/update")
@@ -53,10 +58,19 @@ fn update_lesson_req(new_lesson: UpdateLesson, token: &str) -> test::TestRequest
         .set_json(new_lesson)
 }
 
+/// Send request to **/api/lesson/delete/{id}**
 fn delete_lesson_req(id: i32, token: &str) -> test::TestRequest {
     test::TestRequest::delete()
         .uri(format!("/api/lesson/delete/{id}").as_str())
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
+}
+
+/// Send request to **/api/lesson/upload/{id}**
+fn upload_lesson_req(id: i32, text: &str, token: &str) -> test::TestRequest {
+    test::TestRequest::post()
+        .uri(format!("/api/lesson/upload/{id}").as_str())
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
+        .set_json(text)
 }
 
 /// send request to **/api/auth/signup**
@@ -94,7 +108,7 @@ async fn init_user() -> String {
     tokens.access
 }
 
-async fn init_course() -> i32 {
+async fn init_course(user: &str) -> i32 {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
@@ -105,8 +119,6 @@ async fn init_course() -> i32 {
     let title: Vec<String> = Words(EN, 5..12).fake();
     let title: String = title.join(" ");
     let lang = Language::En;
-
-    let user = init_user().await;
 
     let create_course_res = create_course_req(
         CreateCourse {
@@ -123,6 +135,37 @@ async fn init_course() -> i32 {
     test::read_body_json(create_course_res).await
 }
 
+async fn init_lesson(course_id: i32, user: &str) -> i32 {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title = title.join(" ");
+
+    let subject: Vec<String> = Words(EN, 20..50).fake();
+    let subject = Some(subject.join(" "));
+
+    let create_lesson_res = create_lesson_req(
+        CreateLesson {
+            title,
+            subject,
+            cover_path: None,
+            course_id,
+        },
+        user,
+    )
+    .send_request(&app)
+    .await;
+
+    assert_eq!(create_lesson_res.status(), StatusCode::CREATED);
+
+    test::read_body_json(create_lesson_res).await
+}
+
 #[actix_web::test]
 async fn test_create_lesson_success() {
     let app = test::init_service(
@@ -133,7 +176,7 @@ async fn test_create_lesson_success() {
     .await;
 
     let user = init_user().await;
-    let course_id = init_course().await;
+    let course_id = init_course(&user).await;
 
     let title: Vec<String> = Words(EN, 5..12).fake();
     let title = title.join(" ");
@@ -159,6 +202,40 @@ async fn test_create_lesson_success() {
 }
 
 #[actix_web::test]
+async fn test_create_lesson_fordibben() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+    let course_id = init_course(&user).await;
+
+    let title: Vec<String> = Words(EN, 5..12).fake();
+    let title = title.join(" ");
+
+    let subject: Vec<String> = Words(EN, 20..50).fake();
+    let subject = Some(subject.join(" "));
+
+    let user = init_user().await;
+    let create_lesson_res = create_lesson_req(
+        CreateLesson {
+            title,
+            subject,
+            cover_path: None,
+            course_id,
+        },
+        &user,
+    )
+    .send_request(&app)
+    .await;
+
+    assert_eq!(create_lesson_res.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_web::test]
 async fn test_create_lesson_bad_request() {
     let app = test::init_service(
         App::new()
@@ -168,7 +245,7 @@ async fn test_create_lesson_bad_request() {
     .await;
 
     let user = init_user().await;
-    let course_id = init_course().await;
+    let course_id = init_course(&user).await;
 
     let create_lesson_res = create_lesson_req(
         CreateLesson {
@@ -194,7 +271,8 @@ async fn test_create_lesson_is_private() {
     )
     .await;
 
-    let course_id = init_course().await;
+    let user = init_user().await;
+    let course_id = init_course(&user).await;
 
     let title: Vec<String> = Words(EN, 5..12).fake();
     let title = title.join(" ");
@@ -243,27 +321,9 @@ async fn test_get_lessons_in_course_success() {
     .await;
 
     let user = init_user().await;
-    let course_id = init_course().await;
+    let course_id = init_course(&user).await;
 
-    let title: Vec<String> = Words(EN, 5..12).fake();
-    let title = title.join(" ");
-
-    let subject: Vec<String> = Words(EN, 20..50).fake();
-    let subject = Some(subject.join(" "));
-
-    let create_lesson_res = create_lesson_req(
-        CreateLesson {
-            title,
-            subject,
-            cover_path: None,
-            course_id,
-        },
-        &user,
-    )
-    .send_request(&app)
-    .await;
-
-    assert!(create_lesson_res.status().is_success());
+    init_lesson(course_id, &user).await;
 
     let get_lessons_in_course_res = get_lessons_in_course_req(course_id, &user)
         .send_request(&app)
@@ -305,29 +365,8 @@ async fn test_get_lesson_success() {
     .await;
 
     let user = init_user().await;
-    let course_id = init_course().await;
-
-    let title: Vec<String> = Words(EN, 5..12).fake();
-    let title = title.join(" ");
-
-    let subject: Vec<String> = Words(EN, 20..50).fake();
-    let subject = Some(subject.join(" "));
-
-    let create_lesson_res = create_lesson_req(
-        CreateLesson {
-            title,
-            subject,
-            cover_path: None,
-            course_id,
-        },
-        &user,
-    )
-    .send_request(&app)
-    .await;
-
-    assert!(create_lesson_res.status().is_success());
-
-    let lesson_id = test::read_body_json(create_lesson_res).await;
+    let course_id = init_course(&user).await;
+    let lesson_id = init_lesson(course_id, &user).await;
 
     let get_lesson_res = get_lesson_req(lesson_id, &user).send_request(&app).await;
 
@@ -363,29 +402,8 @@ async fn test_update_lesson_success() {
     .await;
 
     let user = init_user().await;
-    let course_id = init_course().await;
-
-    let title: Vec<String> = Words(EN, 5..12).fake();
-    let title = title.join(" ");
-
-    let subject: Vec<String> = Words(EN, 20..50).fake();
-    let subject = Some(subject.join(" "));
-
-    let create_lesson_res = create_lesson_req(
-        CreateLesson {
-            title,
-            subject,
-            cover_path: None,
-            course_id,
-        },
-        &user,
-    )
-    .send_request(&app)
-    .await;
-
-    assert!(create_lesson_res.status().is_success());
-
-    let lesson_id: i32 = test::read_body_json(create_lesson_res).await;
+    let course_id = init_course(&user).await;
+    let lesson_id = init_lesson(course_id, &user).await;
 
     let new_title: Vec<String> = Words(EN, 5..12).fake();
     let new_title = new_title.join(" ");
@@ -421,6 +439,42 @@ async fn test_update_lesson_success() {
 
     assert_eq!(updated_lesson.title, new_title);
     assert_eq!(updated_lesson.subject, new_subject);
+}
+
+#[actix_web::test]
+async fn test_update_lesson_forbidden() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+    let course_id = init_course(&user).await;
+    let lesson_id = init_lesson(course_id, &user).await;
+
+    let user = init_user().await;
+
+    let new_title: Vec<String> = Words(EN, 5..12).fake();
+    let new_title = new_title.join(" ");
+
+    let new_subject: Vec<String> = Words(EN, 20..50).fake();
+    let new_subject = Some(new_subject.join(" "));
+
+    let update_lesson_res = update_lesson_req(
+        UpdateLesson {
+            id: lesson_id,
+            title: new_title.to_string(),
+            cover_path: None,
+            subject: new_subject.clone(),
+        },
+        &user,
+    )
+    .send_request(&app)
+    .await;
+
+    assert_eq!(update_lesson_res.status(), StatusCode::FORBIDDEN);
 }
 
 #[actix_web::test]
@@ -466,29 +520,9 @@ async fn test_update_lesson_bad_request() {
     .await;
 
     let user = init_user().await;
-    let course_id = init_course().await;
+    let course_id = init_course(&user).await;
 
-    let title: Vec<String> = Words(EN, 5..12).fake();
-    let title = title.join(" ");
-
-    let subject: Vec<String> = Words(EN, 20..50).fake();
-    let subject = Some(subject.join(" "));
-
-    let create_lesson_res = create_lesson_req(
-        CreateLesson {
-            title,
-            subject,
-            cover_path: None,
-            course_id,
-        },
-        &user,
-    )
-    .send_request(&app)
-    .await;
-
-    assert!(create_lesson_res.status().is_success());
-
-    let lesson_id: i32 = test::read_body_json(create_lesson_res).await;
+    let lesson_id = init_lesson(course_id, &user).await;
 
     let new_title = "".to_string();
     let new_subject = None;
@@ -518,30 +552,9 @@ async fn test_delete_lesson_success() {
     .await;
 
     let user = init_user().await;
-    let course_id = init_course().await;
 
-    let title: Vec<String> = Words(EN, 5..12).fake();
-    let title = title.join(" ");
-
-    let subject: Vec<String> = Words(EN, 20..50).fake();
-    let subject = Some(subject.join(" "));
-
-    let create_lesson_res = create_lesson_req(
-        CreateLesson {
-            title,
-            subject,
-            cover_path: None,
-            course_id,
-        },
-        &user,
-    )
-    .send_request(&app)
-    .await;
-
-    assert!(create_lesson_res.status().is_success());
-
-    let lesson_id: i32 = test::read_body_json(create_lesson_res).await;
-
+    let course_id = init_course(&user).await;
+    let lesson_id = init_lesson(course_id, &user).await;
     let delete_lesson_res = delete_lesson_req(lesson_id, &user).send_request(&app).await;
 
     assert_eq!(delete_lesson_res.status(), StatusCode::OK);
@@ -566,4 +579,93 @@ async fn test_delete_lesson_not_found() {
     let delete_lesson_res = delete_lesson_req(lesson_id, &user).send_request(&app).await;
 
     assert_eq!(delete_lesson_res.status(), StatusCode::NOT_FOUND);
+}
+
+#[actix_web::test]
+async fn test_delete_lesson_forbidden() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+
+    let course_id = init_course(&user).await;
+    let lesson_id = init_lesson(course_id, &user).await;
+
+    let user = init_user().await;
+    let delete_lesson_res = delete_lesson_req(lesson_id, &user).send_request(&app).await;
+
+    assert_eq!(delete_lesson_res.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_web::test]
+async fn test_upload_lesson_text_success() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+    let course_id = init_course(&user).await;
+    let lesson_id = init_lesson(course_id, &user).await;
+
+    let lesson_text: Vec<String> = Words(EN, 80..100).fake();
+    let lesson_text = lesson_text.join(" ");
+
+    let upload_lesson_res = upload_lesson_req(lesson_id, &lesson_text, &user)
+        .send_request(&app)
+        .await;
+
+    assert_eq!(upload_lesson_res.status(), StatusCode::OK);
+}
+
+#[actix_web::test]
+async fn test_upload_lesson_text_not_found() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+    let lesson_id = i32::MAX;
+
+    let lesson_text: Vec<String> = Words(EN, 80..100).fake();
+    let lesson_text = lesson_text.join(" ");
+
+    let upload_lesson_res = upload_lesson_req(lesson_id, &lesson_text, &user)
+        .send_request(&app)
+        .await;
+
+    assert_eq!(upload_lesson_res.status(), StatusCode::NOT_FOUND);
+}
+
+#[actix_web::test]
+async fn test_upload_lesson_text_forbidden() {
+    let app = test::init_service(
+        App::new()
+            .app_data(get_app_data().await)
+            .configure(main_config),
+    )
+    .await;
+
+    let user = init_user().await;
+    let course_id = init_course(&user).await;
+    let lesson_id = init_lesson(course_id, &user).await;
+
+    let lesson_text: Vec<String> = Words(EN, 80..100).fake();
+    let lesson_text = lesson_text.join(" ");
+
+    let user = init_user().await;
+    let upload_lesson_res = upload_lesson_req(lesson_id, &lesson_text, &user)
+        .send_request(&app)
+        .await;
+
+    assert_eq!(upload_lesson_res.status(), StatusCode::FORBIDDEN);
 }
