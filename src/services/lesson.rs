@@ -2,7 +2,7 @@ use std::error::Error;
 
 use sqlx::Postgres;
 
-use crate::models::lesson::{CreateLesson, Lesson};
+use crate::models::lesson::{CreateLesson, Lesson, UpdateLesson};
 
 /// Create the lesson in database
 pub async fn create_lesson_db(
@@ -32,12 +32,12 @@ pub async fn find_lesson_by_id(
     let lesson = sqlx::query_as!(
         Lesson,
         r#"
-    SELECT 
-        id, created_at, updated_at, title, content_path, cover_path, subject, course_id 
-    FROM 
-        lessons 
-    WHERE id = $1;
-    "#,
+        SELECT
+            id, created_at, updated_at, title, content_path, cover_path, subject, course_id
+        FROM
+            lessons
+        WHERE id = $1
+        "#,
         id
     )
     .fetch_one(pool)
@@ -47,21 +47,54 @@ pub async fn find_lesson_by_id(
 }
 
 /// Find all lessons in database
-pub async fn find_all_lessons(pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
-    todo!();
+pub async fn find_all_lessons(pool: &sqlx::Pool<Postgres>) -> Result<Vec<Lesson>, Box<dyn Error>> {
+    let lessons = sqlx::query_as!(
+        Lesson,
+        r#"
+        SELECT
+            id, created_at, updated_at, title, content_path, cover_path, subject, course_id
+        FROM
+            lessons
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(lessons)
 }
 
 /// Get all lessons in course from database
-pub async fn find_lessons_in_course(pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
-    todo!();
+pub async fn find_lessons_in_course(
+    course_id: i32,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<Vec<Lesson>, Box<dyn Error>> {
+    let lessons = sqlx::query_as!(
+        Lesson,
+        r#"
+        SELECT
+            id, created_at, updated_at, title, content_path, cover_path, subject, course_id
+        FROM
+            lessons
+        WHERE
+            course_id = $1
+        "#,
+        course_id
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(lessons)
 }
 
 /// Delete lesson by id from database
-pub async fn delete_lesson(pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
+pub async fn delete_lesson(id: i32, pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
     todo!();
 }
 
 /// Update lesson in database
-pub async fn update_lesson(pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
+pub async fn update_lesson(
+    new_lesson: UpdateLesson,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<(), Box<dyn Error>> {
     todo!();
 }
