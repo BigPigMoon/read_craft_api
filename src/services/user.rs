@@ -1,3 +1,4 @@
+use chrono::Utc;
 use crypto::{digest::Digest, sha2::Sha256};
 use sqlx::Postgres;
 use std::error::Error;
@@ -57,11 +58,11 @@ impl User {
             None => None,
         };
 
-        // FIXME: update update time too!!!
         sqlx::query!(
-            "UPDATE users SET refresh_token_hash=$2 WHERE id=$1",
+            "UPDATE users SET refresh_token_hash=$2, updated_at = $3 WHERE id=$1",
             self.id,
-            token
+            token,
+            Utc::now().naive_utc(),
         )
         .execute(pool)
         .await?;

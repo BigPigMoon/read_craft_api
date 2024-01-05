@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use chrono::Utc;
 use sqlx::Postgres;
 
 use crate::models::{
@@ -61,12 +62,12 @@ pub async fn update_course_db(
     new_course: UpdateCourse,
     pool: &sqlx::Pool<Postgres>,
 ) -> Result<(), Box<dyn Error>> {
-    // FIXME: update update time too!!!
     sqlx::query!(
-        "UPDATE courses SET title = $2, language = $3 WHERE id = $1",
+        "UPDATE courses SET title = $2, language = $3, updated_at = $4 WHERE id = $1",
         new_course.id,
         new_course.title,
-        new_course.language as Language
+        new_course.language as Language,
+        Utc::now().naive_utc(),
     )
     .execute(pool)
     .await?;
