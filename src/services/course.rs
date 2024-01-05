@@ -35,7 +35,7 @@ pub async fn create_course_db(
     Ok(new_course_id)
 }
 
-/// finding course by id
+/// Finding course by id
 pub async fn find_course_by_id(
     id: &i32,
     pool: &sqlx::Pool<Postgres>,
