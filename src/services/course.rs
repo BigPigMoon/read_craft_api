@@ -61,6 +61,7 @@ pub async fn update_course_db(
     new_course: UpdateCourse,
     pool: &sqlx::Pool<Postgres>,
 ) -> Result<(), Box<dyn Error>> {
+    // FIXME: update update time too!!!
     sqlx::query!(
         "UPDATE courses SET title = $2, language = $3 WHERE id = $1",
         new_course.id,
