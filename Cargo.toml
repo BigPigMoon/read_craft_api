@@ -26,6 +26,14 @@ rust-crypto = "^0.2"
 futures-util = "0.3"
 chrono = { version = "0.4.31", features = ["serde"] }
 
+[dependencies.uuid]
+version = "1.6.1"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
+
 [dev-dependencies]
 fake = { version = "2.9.1", features = ["derive"] }
 lazy_static = "1.4.0"
