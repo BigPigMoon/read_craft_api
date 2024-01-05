@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use ::chrono::Utc;
 use sqlx::Postgres;
 
 use crate::models::lesson::{CreateLesson, Lesson, UpdateLesson};
@@ -88,7 +89,11 @@ pub async fn find_lessons_in_course(
 
 /// Delete lesson by id from database
 pub async fn delete_lesson(id: i32, pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
-    todo!();
+    sqlx::query!("DELETE FROM lessons WHERE id = $1", id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
 }
 
 /// Update lesson in database
@@ -96,5 +101,16 @@ pub async fn update_lesson(
     new_lesson: UpdateLesson,
     pool: &sqlx::Pool<Postgres>,
 ) -> Result<(), Box<dyn Error>> {
-    todo!();
+    sqlx::query!(
+        "UPDATE lessons SET title = $2, subject = $3, cover_path = $4, updated_at = $5 WHERE id = $1",
+        new_lesson.id,
+        new_lesson.title,
+        new_lesson.subject,
+        new_lesson.cover_path,
+        Utc::now().naive_utc(),
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
