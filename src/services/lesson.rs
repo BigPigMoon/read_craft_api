@@ -2,8 +2,9 @@ use std::error::Error;
 
 use sqlx::Postgres;
 
-use crate::models::lesson::CreateLesson;
+use crate::models::lesson::{CreateLesson, Lesson};
 
+/// Create the lesson in database
 pub async fn create_lesson_db(
     lesson: &CreateLesson,
     content_path: &str,
@@ -23,22 +24,44 @@ pub async fn create_lesson_db(
     Ok(new_lesson_id)
 }
 
-pub async fn find_lesson_by_id() -> Result<(), Box<dyn Error>> {
+/// Find the lesson by id in database
+pub async fn find_lesson_by_id(
+    id: i32,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<Lesson, Box<dyn Error>> {
+    let lesson = sqlx::query_as!(
+        Lesson,
+        r#"
+    SELECT 
+        id, created_at, updated_at, title, content_path, cover_path, subject, course_id 
+    FROM 
+        lessons 
+    WHERE id = $1;
+    "#,
+        id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(lesson)
+}
+
+/// Find all lessons in database
+pub async fn find_all_lessons(pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
     todo!();
 }
 
-pub async fn find_all_lessons() -> Result<(), Box<dyn Error>> {
+/// Get all lessons in course from database
+pub async fn find_lessons_in_course(pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
     todo!();
 }
 
-pub async fn find_lessons_in_course() -> Result<(), Box<dyn Error>> {
+/// Delete lesson by id from database
+pub async fn delete_lesson(pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
     todo!();
 }
 
-pub async fn delete_lesson() -> Result<(), Box<dyn Error>> {
-    todo!();
-}
-
-pub async fn update_lesson() -> Result<(), Box<dyn Error>> {
+/// Update lesson in database
+pub async fn update_lesson(pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
     todo!();
 }
