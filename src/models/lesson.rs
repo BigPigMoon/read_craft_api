@@ -11,7 +11,7 @@ pub struct Lesson {
     pub content_path: String,
     pub cover_path: Option<String>,
     pub subject: Option<String>,
-    pub course_id: i32,
+    pub course_id: Option<i32>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Validate)]
