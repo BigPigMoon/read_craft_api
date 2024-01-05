@@ -29,6 +29,7 @@ pub fn lesson_config(cfg: &mut web::ServiceConfig) {
             .service(get_lessons)
             .service(get_lesson)
             .service(update_lesson)
+            .service(upload_lesson_text)
             .service(delete_lesson),
     );
 }
@@ -156,6 +157,16 @@ pub async fn update_lesson(
 
 #[delete("/delete/{id}")]
 pub async fn delete_lesson(
+    creds: JwtCred,
+    new_lesson: web::Json<UpdateLesson>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
+    todo!();
+    HttpResponse::Ok()
+}
+
+#[post("/upload/{id}")]
+pub async fn upload_lesson_text(
     creds: JwtCred,
     new_lesson: web::Json<UpdateLesson>,
     app_data: web::Data<AppState>,
