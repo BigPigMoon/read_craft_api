@@ -88,7 +88,7 @@ pub async fn find_lessons_in_course(
 }
 
 /// Delete lesson by id from database
-pub async fn delete_lesson(id: i32, pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
+pub async fn delete_lesson_db(id: i32, pool: &sqlx::Pool<Postgres>) -> Result<(), Box<dyn Error>> {
     sqlx::query!("DELETE FROM lessons WHERE id = $1", id)
         .execute(pool)
         .await?;
@@ -97,8 +97,8 @@ pub async fn delete_lesson(id: i32, pool: &sqlx::Pool<Postgres>) -> Result<(), B
 }
 
 /// Update lesson in database
-pub async fn update_lesson(
-    new_lesson: UpdateLesson,
+pub async fn update_lesson_db(
+    new_lesson: &UpdateLesson,
     pool: &sqlx::Pool<Postgres>,
 ) -> Result<(), Box<dyn Error>> {
     sqlx::query!(
