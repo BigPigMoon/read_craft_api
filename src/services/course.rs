@@ -38,7 +38,7 @@ pub async fn create_course_db(
 
 /// Finding course by id
 pub async fn find_course_by_id(
-    id: &i32,
+    id: i32,
     pool: &sqlx::Pool<Postgres>,
 ) -> Result<Course, Box<dyn Error>> {
     let course = sqlx::query_as!(
@@ -170,7 +170,7 @@ pub async fn get_subscribed(
     let mut courses: Vec<Course> = Vec::new();
 
     for id in ids.iter() {
-        let course = find_course_by_id(id, pool).await.unwrap();
+        let course = find_course_by_id(*id, pool).await.unwrap();
 
         courses.push(course);
     }

@@ -113,7 +113,7 @@ pub async fn get_course(
         course_id
     );
 
-    let course = match find_course_by_id(&course_id, &app_data.pool).await {
+    let course = match find_course_by_id(course_id, &app_data.pool).await {
         Ok(course) => course,
         Err(err) => {
             log::error!(
@@ -159,7 +159,7 @@ pub async fn update_course(
         });
     }
 
-    if let Err(err) = find_course_by_id(&course_id, &app_data.pool).await {
+    if let Err(err) = find_course_by_id(course_id, &app_data.pool).await {
         log::warn!(
             "{}: course by id: {} was not found, error: {}",
             op,
@@ -217,7 +217,7 @@ pub async fn delete_course(
     let course_id = path.into_inner();
     let user_id = creds.uid;
 
-    if let Err(err) = find_course_by_id(&course_id, &app_data.pool).await {
+    if let Err(err) = find_course_by_id(course_id, &app_data.pool).await {
         log::warn!(
             "{}: course by id: {} was not found, error: {}",
             op,
@@ -300,7 +300,7 @@ pub async fn subscribe(
         course_id
     );
 
-    if let Err(err) = find_course_by_id(&course_id, &app_data.pool).await {
+    if let Err(err) = find_course_by_id(course_id, &app_data.pool).await {
         log::error!(
             "{}: course not found, error: {}, course_id: {}",
             op,
@@ -350,7 +350,7 @@ pub async fn unsubscribe(
         creds.uid
     );
 
-    if let Err(err) = find_course_by_id(&course_id, &app_data.pool).await {
+    if let Err(err) = find_course_by_id(course_id, &app_data.pool).await {
         log::error!(
             "{}: course not found, error: {}, course_id: {}",
             op,
