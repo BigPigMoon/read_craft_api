@@ -2,4 +2,4 @@
 *.env
 *.lock
 storage
-
+.vscode
