@@ -1,5 +1,10 @@
 use std::env;
 
+use tokio::{
+    fs::{create_dir_all, File},
+    io::AsyncWriteExt,
+};
+
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use dotenvy::dotenv;
 use serde::Deserialize;
@@ -83,13 +88,9 @@ pub async fn create_lesson(
 
     let lesson_filename = Uuid::new_v4().to_string();
 
-    dotenv().ok();
-
-    let lessons_dir = env::var("LESSONS_DIR").unwrap_or("/lessons".to_string());
-
     let new_course_id = match create_lesson_db(
         &lesson.0,
-        &format!("{}/{}.md", lessons_dir, lesson_filename),
+        &format!("{}.md", lesson_filename),
         &app_data.pool,
     )
     .await
@@ -357,12 +358,86 @@ pub async fn delete_lesson(
 #[post("/upload/{id}")]
 pub async fn upload_lesson_text(
     creds: JwtCred,
+    path: web::Path<i32>,
     lesson_text: String,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
     let op = "upload_lesson_text";
 
-    log::info!("{}: attempting to upload lesson text", op);
+    let lesson_id = path.into_inner();
+    let user_id = creds.uid;
+
+    log::info!(
+        "{}: attempting to upload lesson text to lesson: {}, user id: {}",
+        op,
+        lesson_id,
+        user_id
+    );
+
+    let uploading_lesson = match find_lesson_by_id(lesson_id, &app_data.pool).await {
+        Ok(lesson) => lesson,
+        Err(err) => {
+            log::error!(
+                "{}: lesson by id: {} was not found, error: {}",
+                op,
+                lesson_id,
+                err,
+            );
+
+            return HttpResponse::NotFound();
+        }
+    };
+
+    if !user_is_owner(user_id, uploading_lesson.course_id.unwrap(), &app_data.pool)
+        .await
+        .unwrap_or(false)
+    {
+        log::warn!(
+            "{}: user by id: {}, is not owner of course id: {:?}",
+            op,
+            user_id,
+            uploading_lesson.course_id
+        );
+
+        return HttpResponse::Forbidden();
+    }
+
+    // create directory first
+    // TODO: add it into app_data!
+    dotenv().ok();
+    let file_path = env::var("LESSONS_DIR").unwrap_or("./lessons".to_string());
+
+    create_dir_all(&file_path).await.unwrap();
+
+    // write text into file
+    let mut lesson_file =
+        match File::create(format!("{}/{}", &file_path, uploading_lesson.content_path)).await {
+            Ok(file) => file,
+            Err(err) => {
+                log::error!(
+                    "{}: cannot create file, file path: {}/{}, error: {}",
+                    op,
+                    file_path,
+                    uploading_lesson.content_path,
+                    err
+                );
+
+                return HttpResponse::InternalServerError();
+            }
+        };
+
+    if let Err(err) = lesson_file.write_all(lesson_text.as_bytes()).await {
+        log::error!(
+            "{}: cannot write lesson into file, file path: {}, error: {}",
+            op,
+            uploading_lesson.content_path,
+            err
+        );
+
+        return HttpResponse::InternalServerError();
+    };
+
+    log::info!("{}: lessons are writed into file successfuly", op);
 
     HttpResponse::Ok()
 }
