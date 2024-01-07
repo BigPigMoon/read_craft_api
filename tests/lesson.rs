@@ -1,3 +1,4 @@
+use actix_http::body::MessageBody;
 use actix_web::{
     http::{header, StatusCode},
     test, App,
@@ -66,11 +67,11 @@ fn delete_lesson_req(id: i32, token: &str) -> test::TestRequest {
 }
 
 /// Send request to **/api/lesson/upload/{id}**
-fn upload_lesson_req(id: i32, text: &str, token: &str) -> test::TestRequest {
+fn upload_lesson_req(id: i32, text: String, token: &str) -> test::TestRequest {
     test::TestRequest::post()
         .uri(format!("/api/lesson/upload/{id}").as_str())
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
-        .set_json(text)
+        .set_payload(text)
 }
 
 /// send request to **/api/auth/signup**
@@ -617,7 +618,7 @@ async fn test_upload_lesson_text_success() {
     let lesson_text: Vec<String> = Words(EN, 80..100).fake();
     let lesson_text = lesson_text.join(" ");
 
-    let upload_lesson_res = upload_lesson_req(lesson_id, &lesson_text, &user)
+    let upload_lesson_res = upload_lesson_req(lesson_id, lesson_text, &user)
         .send_request(&app)
         .await;
 
@@ -639,7 +640,7 @@ async fn test_upload_lesson_text_not_found() {
     let lesson_text: Vec<String> = Words(EN, 80..100).fake();
     let lesson_text = lesson_text.join(" ");
 
-    let upload_lesson_res = upload_lesson_req(lesson_id, &lesson_text, &user)
+    let upload_lesson_res = upload_lesson_req(lesson_id, lesson_text, &user)
         .send_request(&app)
         .await;
 
@@ -663,7 +664,7 @@ async fn test_upload_lesson_text_forbidden() {
     let lesson_text = lesson_text.join(" ");
 
     let user = init_user().await;
-    let upload_lesson_res = upload_lesson_req(lesson_id, &lesson_text, &user)
+    let upload_lesson_res = upload_lesson_req(lesson_id, lesson_text, &user)
         .send_request(&app)
         .await;
 

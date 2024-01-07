@@ -357,11 +357,12 @@ pub async fn delete_lesson(
 #[post("/upload/{id}")]
 pub async fn upload_lesson_text(
     creds: JwtCred,
-    lesson: web::Json<String>,
+    lesson_text: String,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
     let op = "upload_lesson_text";
 
-    todo!();
+    log::info!("{}: attempting to upload lesson text", op);
+
     HttpResponse::Ok()
 }
