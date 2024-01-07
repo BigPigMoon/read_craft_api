@@ -155,7 +155,7 @@ pub async fn update_course(
         log::error!("{}: data is not validated, data: {:?}", op, new_course);
 
         return HttpResponse::BadRequest().json(ErrorResponse {
-            message: String::from("title field is empty"),
+            message: "title field is empty".to_string(),
         });
     }
 
@@ -188,22 +188,19 @@ pub async fn update_course(
         });
     }
 
-    match update_course_db(new_course.0, &app_data.pool).await {
-        Ok(_) => {}
-        Err(err) => {
-            log::error!(
-                "{}: connon update course by id: {} of user_id: {}, error: {}",
-                op,
-                course_id,
-                user_id,
-                err
-            );
+    if let Err(err) = update_course_db(new_course.0, &app_data.pool).await {
+        log::error!(
+            "{}: connon update course by id: {} of user_id: {}, error: {}",
+            op,
+            course_id,
+            user_id,
+            err
+        );
 
-            return HttpResponse::InternalServerError().json(ErrorResponse {
-                message: "cannot update course".to_string(),
-            });
-        }
-    }
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            message: "cannot update course".to_string(),
+        });
+    };
 
     HttpResponse::Ok().json(course_id)
 }
@@ -245,13 +242,10 @@ pub async fn delete_course(
         return HttpResponse::Forbidden();
     }
 
-    match delete_course_db(course_id, &app_data.pool).await {
-        Ok(_) => {}
-        Err(err) => {
-            log::error!("{}: cannot delete course, error: {}", op, err);
+    if let Err(err) = delete_course_db(course_id, &app_data.pool).await {
+        log::error!("{}: cannot delete course, error: {}", op, err);
 
-            return HttpResponse::InternalServerError();
-        }
+        return HttpResponse::InternalServerError();
     }
 
     HttpResponse::Ok()
