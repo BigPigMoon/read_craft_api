@@ -131,37 +131,167 @@ pub async fn get_lessons(
     filter: web::Query<GetAllLessonsFilter>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
+    let op = "get_lessons";
+
     todo!();
     HttpResponse::Ok()
 }
 
 #[get("/get/{id}")]
 pub async fn get_lesson(
-    creds: JwtCred,
+    _: JwtCred,
     path: web::Path<i32>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
-    todo!();
-    HttpResponse::Ok()
+    let op = "get_lesson";
+    let lesson_id = path.into_inner();
+
+    log::info!("{}: attempting to get lesson by id: {}", op, lesson_id);
+
+    let lesson = match find_lesson_by_id(lesson_id, &app_data.pool).await {
+        Ok(lesson) => lesson,
+        Err(err) => {
+            log::error!(
+                "{}: lesson by id: {} is not exist, error: {}",
+                op,
+                lesson_id,
+                err,
+            );
+
+            return HttpResponse::NotFound().json(ErrorResponse {
+                message: "lesson by id is not exist".to_string(),
+            });
+        }
+    };
+
+    log::info!("{}: lesson are getting, lesson: {:?}", op, lesson);
+
+    HttpResponse::Ok().json(lesson)
 }
 
+/// Update lesson
+/// Get json with new data
 #[put("/update")]
 pub async fn update_lesson(
     creds: JwtCred,
     new_lesson: web::Json<UpdateLesson>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
-    todo!();
-    HttpResponse::Ok()
+    let op = "update_lesson";
+    let user_id = creds.uid;
+    let lesson_id = new_lesson.id;
+
+    log::info!(
+        "{}: attempting to update lesson, new_lesson: {:?}, user_id: {}",
+        op,
+        new_lesson,
+        user_id
+    );
+
+    if new_lesson.validate().is_err() {
+        log::error!("{}: data is not valid, data: {:?}", op, new_lesson);
+
+        return HttpResponse::BadRequest().json(ErrorResponse {
+            message: "data is not valid".to_string(),
+        });
+    }
+
+    let updating_lesson = match find_lesson_by_id(lesson_id, &app_data.pool).await {
+        Ok(lesson) => lesson,
+        Err(err) => {
+            log::error!(
+                "{}: lesson by id: {} is not exist, error: {}",
+                op,
+                lesson_id,
+                err
+            );
+
+            return HttpResponse::NotFound().json(ErrorResponse {
+                message: "lesson by id is not exist".to_string(),
+            });
+        }
+    };
+
+    if !user_is_owner(user_id, updating_lesson.course_id.unwrap(), &app_data.pool)
+        .await
+        .unwrap_or(false)
+    {
+        log::warn!(
+            "{}: user by id: {}, is not owner of course id: {:?}",
+            op,
+            user_id,
+            updating_lesson.course_id
+        );
+
+        return HttpResponse::Forbidden().json(ErrorResponse {
+            message: "user is not owner of course".to_string(),
+        });
+    }
+
+    if let Err(err) = update_lesson_db(&new_lesson, &app_data.pool).await {
+        log::error!(
+            "{}: connon update lesson by id: {} of user_id: {}, error: {}",
+            op,
+            lesson_id,
+            user_id,
+            err
+        );
+
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            message: "cannot update lesson".to_string(),
+        });
+    };
+
+    HttpResponse::Ok().json(lesson_id)
 }
 
+/// Delete lesson by id from path
 #[delete("/delete/{id}")]
 pub async fn delete_lesson(
     creds: JwtCred,
-    new_lesson: web::Json<UpdateLesson>,
+    path: web::Path<i32>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
-    todo!();
+    let op = "delete_lesson";
+
+    let lesson_id = path.into_inner();
+    let user_id = creds.uid;
+
+    let deleting_lesson = match find_lesson_by_id(lesson_id, &app_data.pool).await {
+        Ok(lesson) => lesson,
+        Err(err) => {
+            log::error!(
+                "{}: lesson by id: {} was not found, error: {}",
+                op,
+                lesson_id,
+                err,
+            );
+
+            return HttpResponse::NotFound();
+        }
+    };
+
+    let course_id = deleting_lesson.course_id.unwrap();
+    if !user_is_owner(user_id, course_id, &app_data.pool)
+        .await
+        .unwrap_or(false)
+    {
+        log::warn!(
+            "{}: user by id: {}, is not owner of course id: {}",
+            op,
+            user_id,
+            course_id
+        );
+
+        return HttpResponse::Forbidden();
+    }
+
+    if let Err(err) = delete_lesson_db(lesson_id, &app_data.pool).await {
+        log::error!("{}: cannot delete lesson, error: {}", op, err);
+
+        return HttpResponse::InternalServerError();
+    }
+
     HttpResponse::Ok()
 }
 
@@ -171,6 +301,8 @@ pub async fn upload_lesson_text(
     new_lesson: web::Json<UpdateLesson>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
+    let op = "";
+
     todo!();
     HttpResponse::Ok()
 }
