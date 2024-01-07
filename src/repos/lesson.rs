@@ -1,7 +1,4 @@
-use std::{
-    env,
-    fs::{self, File},
-};
+use std::env;
 
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use dotenvy::dotenv;
@@ -55,7 +52,7 @@ pub async fn create_lesson(
         });
     }
 
-    if let Err(err) = find_course_by_id(&lesson.course_id, &app_data.pool).await {
+    if let Err(err) = find_course_by_id(lesson.course_id, &app_data.pool).await {
         log::warn!(
             "{}: course by id: {} not found, error: {}",
             op,
@@ -130,14 +127,64 @@ pub struct GetAllLessonsFilter {
 /// Or get lesson in course by query ?course={course_id}
 #[get("/all")]
 pub async fn get_lessons(
-    creds: JwtCred,
+    _: JwtCred,
     filter: web::Query<GetAllLessonsFilter>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
     let op = "get_lessons";
 
-    todo!();
-    HttpResponse::Ok()
+    log::info!("{}: attempting to get lessons, filter: {:?}", op, filter);
+
+    match filter.course {
+        Some(course_id) => match find_course_by_id(course_id, &app_data.pool).await {
+            Ok(_) => match find_lessons_in_course(course_id, &app_data.pool).await {
+                Ok(lessons) => {
+                    log::info!("{}: courses are successfuly returned", op);
+
+                    HttpResponse::Ok().json(lessons)
+                }
+                Err(err) => {
+                    log::error!(
+                        "{}: cannot get all lessons in course id: {}, error: {}",
+                        op,
+                        course_id,
+                        err
+                    );
+
+                    HttpResponse::InternalServerError().json(ErrorResponse {
+                        message: "".to_string(),
+                    })
+                }
+            },
+            Err(err) => {
+                log::error!(
+                    "{}: course by id: {} is not exist, error: {}",
+                    op,
+                    course_id,
+                    err
+                );
+
+                HttpResponse::NotFound().json(ErrorResponse {
+                    message: "course is not exist".to_string(),
+                })
+            }
+        },
+
+        None => match find_all_lessons(&app_data.pool).await {
+            Ok(lessons) => {
+                log::info!("{}: courses are successfuly returned", op);
+
+                HttpResponse::Ok().json(lessons)
+            }
+            Err(err) => {
+                log::error!("{}: cannot get all lessons, error: {}", op, err);
+
+                HttpResponse::InternalServerError().json(ErrorResponse {
+                    message: "cannot get all lessons".to_string(),
+                })
+            }
+        },
+    }
 }
 
 /// Get the lesson by id
