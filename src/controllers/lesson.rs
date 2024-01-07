@@ -308,6 +308,13 @@ pub async fn delete_lesson(
     let lesson_id = path.into_inner();
     let user_id = creds.uid;
 
+    log::info!(
+        "{}: attempting to delete lesson, lesson id: {}, user_id: {}",
+        op,
+        lesson_id,
+        user_id
+    );
+
     let deleting_lesson = match find_lesson_by_id(lesson_id, &app_data.pool).await {
         Ok(lesson) => lesson,
         Err(err) => {
@@ -348,8 +355,12 @@ pub async fn delete_lesson(
 
 /// Upload lesson text to server
 #[post("/upload/{id}")]
-pub async fn upload_lesson_text(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
-    let op = "";
+pub async fn upload_lesson_text(
+    creds: JwtCred,
+    lesson: web::Json<String>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
+    let op = "upload_lesson_text";
 
     todo!();
     HttpResponse::Ok()

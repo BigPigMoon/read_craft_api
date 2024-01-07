@@ -1,6 +1,6 @@
 pub mod extractors;
 pub mod models;
-pub mod repos;
+pub mod controllers;
 pub mod services;
 pub mod utils;
 
@@ -11,7 +11,7 @@ use std::env;
 use actix_web::web;
 use dotenvy::dotenv;
 use jwt_simple::algorithms::HS256Key;
-use repos::{auth::auth_config, course::course_config, lesson::lesson_config};
+use controllers::{auth::auth_config, course::course_config, lesson::lesson_config};
 use sqlx::{Pool, Postgres};
 use utils::jwt::JwtUtil;
 
