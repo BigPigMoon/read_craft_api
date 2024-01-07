@@ -1,4 +1,3 @@
-use actix_http::body::MessageBody;
 use actix_web::{
     http::{header, StatusCode},
     test, App,
