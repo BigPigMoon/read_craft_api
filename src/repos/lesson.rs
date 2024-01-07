@@ -34,6 +34,7 @@ pub fn lesson_config(cfg: &mut web::ServiceConfig) {
     );
 }
 
+/// Create lesson from JSON
 #[post("/create")]
 pub async fn create_lesson(
     creds: JwtCred,
@@ -125,6 +126,8 @@ pub struct GetAllLessonsFilter {
     course: Option<i32>,
 }
 
+/// Get all lessons in database
+/// Or get lesson in course by query ?course={course_id}
 #[get("/all")]
 pub async fn get_lessons(
     creds: JwtCred,
@@ -137,6 +140,7 @@ pub async fn get_lessons(
     HttpResponse::Ok()
 }
 
+/// Get the lesson by id
 #[get("/get/{id}")]
 pub async fn get_lesson(
     _: JwtCred,
@@ -295,12 +299,9 @@ pub async fn delete_lesson(
     HttpResponse::Ok()
 }
 
+/// Upload lesson text to server
 #[post("/upload/{id}")]
-pub async fn upload_lesson_text(
-    creds: JwtCred,
-    new_lesson: web::Json<UpdateLesson>,
-    app_data: web::Data<AppState>,
-) -> impl Responder {
+pub async fn upload_lesson_text(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
     let op = "";
 
     todo!();
