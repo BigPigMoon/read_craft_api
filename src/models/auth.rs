@@ -19,8 +19,8 @@ pub struct SignInData {
 pub struct SignUpData {
     #[validate(email)]
     pub email: String,
-    #[validate(length(min = 1))]
+    #[validate(length(min = 6))]
     pub username: String,
-    #[validate(length(min = 1))]
+    #[validate(length(min = 6))]
     pub password: String,
 }
