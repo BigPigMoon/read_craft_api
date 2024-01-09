@@ -25,6 +25,9 @@ pub fn auth_config(cfg: &mut web::ServiceConfig) {
     );
 }
 
+const ACCESS_DURATION_MIN: u64 = 20;
+const REFRESH_DURATION_DAY: u64 = 14;
+
 /// Sign up request
 ///
 /// Register user in system return pair of JWT
@@ -34,12 +37,12 @@ pub fn auth_config(cfg: &mut web::ServiceConfig) {
 #[post("/signup")]
 pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) -> impl Responder {
     let op = "signup";
-    log::info!("{}: attempting to sign up user, data: {:?}", op, data);
+    log::info!("{}: attempting to sign up user", op);
 
     let jwt_controller = &app_data.jwt;
 
     if data.validate().is_err() {
-        log::error!("{}: data is not validated, data: {:?}", op, data);
+        log::error!("{}: data is not validated", op);
 
         return HttpResponse::BadRequest().json(ErrorResponse {
             message: String::from("invalid data"),
@@ -79,7 +82,7 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
                 email: data.email.clone(),
                 scope: scopes::ACCESS.to_string(),
             },
-            Duration::from_mins(20),
+            Duration::from_mins(ACCESS_DURATION_MIN),
         )
         .unwrap();
 
@@ -90,7 +93,7 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
                 email: data.email.clone(),
                 scope: scopes::REFRESH.to_string(),
             },
-            Duration::from_days(14),
+            Duration::from_days(REFRESH_DURATION_DAY),
         )
         .unwrap();
 
@@ -119,7 +122,7 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
 #[post("/signin")]
 pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) -> impl Responder {
     let op = "sigin";
-    log::info!("{}: attempting to login user, data: {:?}", op, data);
+    log::info!("{}: attempting to login user", op);
 
     let jwt = &app_data.jwt;
 
@@ -164,7 +167,7 @@ pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) 
                 email: user.email.clone(),
                 scope: scopes::ACCESS.to_string(),
             },
-            Duration::from_mins(20),
+            Duration::from_mins(ACCESS_DURATION_MIN),
         )
         .unwrap();
     let refresh = jwt
@@ -174,7 +177,7 @@ pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) 
                 email: user.email.clone(),
                 scope: scopes::REFRESH.to_string(),
             },
-            Duration::from_days(14),
+            Duration::from_days(REFRESH_DURATION_DAY),
         )
         .unwrap();
 
@@ -331,7 +334,7 @@ pub async fn refresh_token(req: HttpRequest, app_data: web::Data<AppState>) -> i
                 email: user.email.clone(),
                 scope: scopes::ACCESS.to_string(),
             },
-            Duration::from_mins(20),
+            Duration::from_mins(ACCESS_DURATION_MIN),
         )
         .unwrap();
     let refresh = jwt
@@ -341,7 +344,7 @@ pub async fn refresh_token(req: HttpRequest, app_data: web::Data<AppState>) -> i
                 email: user.email.clone(),
                 scope: scopes::REFRESH.to_string(),
             },
-            Duration::from_days(14),
+            Duration::from_days(REFRESH_DURATION_DAY),
         )
         .unwrap();
 
