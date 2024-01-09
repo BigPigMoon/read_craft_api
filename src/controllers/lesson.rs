@@ -2,7 +2,7 @@ use std::env;
 
 use tokio::{
     fs::{create_dir_all, File},
-    io::AsyncWriteExt,
+    io::{AsyncReadExt, AsyncWriteExt},
 };
 
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
@@ -32,11 +32,15 @@ pub fn lesson_config(cfg: &mut web::ServiceConfig) {
             .service(get_lesson)
             .service(update_lesson)
             .service(upload_lesson_text)
+            .service(get_lesson_text)
             .service(delete_lesson),
     );
 }
 
 /// Create lesson from JSON
+///
+/// Path:
+/// **/api/lesson/create**
 #[post("/create")]
 pub async fn create_lesson(
     creds: JwtCred,
@@ -125,7 +129,11 @@ pub struct GetAllLessonsFilter {
 }
 
 /// Get all lessons in database
-/// Or get lesson in course by query ?course={course_id}
+///
+/// Path:
+/// **/api/lesson/all**
+/// Or get lesson in course by query
+/// **/api/lesson/all?course=*{course_id}***
 #[get("/all")]
 pub async fn get_lessons(
     _: JwtCred,
@@ -189,6 +197,9 @@ pub async fn get_lessons(
 }
 
 /// Get the lesson by id
+///
+/// Path:
+/// **/api/lesson/get/*{id}***
 #[get("/get/{id}")]
 pub async fn get_lesson(
     _: JwtCred,
@@ -223,6 +234,9 @@ pub async fn get_lesson(
 
 /// Update lesson
 /// Get json with new data
+///
+/// Path:
+/// **/api/lesson/update**
 #[put("/update")]
 pub async fn update_lesson(
     creds: JwtCred,
@@ -298,6 +312,9 @@ pub async fn update_lesson(
 }
 
 /// Delete lesson by id from path
+///
+/// Path:
+/// **/api/lesson/delete/*{id}***
 #[delete("/delete/{id}")]
 pub async fn delete_lesson(
     creds: JwtCred,
@@ -355,6 +372,9 @@ pub async fn delete_lesson(
 }
 
 /// Upload lesson text to server
+///
+/// Path:
+/// **/api/lesson/upload/*{id}***
 #[post("/upload/{id}")]
 pub async fn upload_lesson_text(
     creds: JwtCred,
@@ -440,4 +460,76 @@ pub async fn upload_lesson_text(
     log::info!("{}: lessons are writed into file successfuly", op);
 
     HttpResponse::Ok()
+}
+
+/// Get lesson text
+///
+/// Path:
+/// **/api/lesson/text/*{id}***
+#[get("text/{id}")]
+pub async fn get_lesson_text(
+    creds: JwtCred,
+    path: web::Path<i32>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
+    let op = "get_lesson_text";
+
+    let lesson_id = path.into_inner();
+    let user_id = creds.uid;
+
+    log::info!(
+        "{}: attempting to upload lesson text to lesson: {}, user id: {}",
+        op,
+        lesson_id,
+        user_id
+    );
+
+    let lesson = match find_lesson_by_id(lesson_id, &app_data.pool).await {
+        Ok(lesson) => lesson,
+        Err(err) => {
+            log::error!(
+                "{}: lesson by id: {} was not found, error: {}",
+                op,
+                lesson_id,
+                err,
+            );
+
+            return HttpResponse::NotFound().json(ErrorResponse {
+                message: "lesson not found".to_string(),
+            });
+        }
+    };
+
+    // FIXME: add it into app_data!
+    dotenv().ok();
+    let file_path = env::var("LESSONS_DIR").unwrap_or("./lessons".to_string());
+
+    let mut file = match File::open(format!("{}/{}", &file_path, lesson.content_path)).await {
+        Ok(file) => file,
+        Err(err) => {
+            log::error!(
+                "{}: cannot open the file, file path: {}/{}, error: {}",
+                op,
+                file_path,
+                lesson.content_path,
+                err
+            );
+
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                message: "can not open the file".to_string(),
+            });
+        }
+    };
+
+    let mut buf = String::new();
+
+    match file.read_to_string(&mut buf).await {
+        Ok(_) => HttpResponse::Ok().json(buf),
+        Err(err) => {
+            log::error!("{}: can not get data from file, error: {}", op, err);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                message: "can not get data from file".to_string(),
+            })
+        }
+    }
 }
