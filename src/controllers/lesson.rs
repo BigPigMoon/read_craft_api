@@ -403,7 +403,7 @@ pub async fn upload_lesson_text(
     }
 
     // create directory first
-    // TODO: add it into app_data!
+    // FIXME: add it into app_data!
     dotenv().ok();
     let file_path = env::var("LESSONS_DIR").unwrap_or("./lessons".to_string());
 
