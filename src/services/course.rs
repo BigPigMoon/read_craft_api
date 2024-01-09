@@ -160,19 +160,24 @@ pub async fn get_subscribed(
     user_id: i32,
     pool: &sqlx::Pool<Postgres>,
 ) -> Result<Vec<Course>, Box<dyn Error>> {
-    let ids: Vec<i32> = sqlx::query!("SELECT id FROM course_user WHERE user_id=$1", user_id)
-        .fetch_all(pool)
-        .await?
-        .into_iter()
-        .map(|rec| rec.id)
-        .collect();
+    let ids: Vec<Option<i32>> = sqlx::query!(
+        "SELECT course_id FROM course_user WHERE user_id=$1",
+        user_id
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|rec| rec.course_id)
+    .collect();
 
     let mut courses: Vec<Course> = Vec::new();
 
     for id in ids.iter() {
-        let course = find_course_by_id(*id, pool).await.unwrap();
+        if let Some(id) = id {
+            let course = find_course_by_id(*id, pool).await.unwrap();
 
-        courses.push(course);
+            courses.push(course);
+        }
     }
 
     Ok(courses)
