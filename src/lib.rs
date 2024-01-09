@@ -1,6 +1,6 @@
+pub mod controllers;
 pub mod extractors;
 pub mod models;
-pub mod controllers;
 pub mod services;
 pub mod utils;
 
@@ -9,9 +9,11 @@ extern crate crypto;
 use std::env;
 
 use actix_web::web;
+use controllers::{
+    auth::auth_config, course::course_config, language::get_languages, lesson::lesson_config,
+};
 use dotenvy::dotenv;
 use jwt_simple::algorithms::HS256Key;
-use controllers::{auth::auth_config, course::course_config, lesson::lesson_config};
 use sqlx::{Pool, Postgres};
 use utils::jwt::JwtUtil;
 
@@ -50,6 +52,7 @@ pub fn main_config(cfg: &mut web::ServiceConfig) {
         web::scope("/api")
             .configure(auth_config)
             .configure(course_config)
-            .configure(lesson_config),
+            .configure(lesson_config)
+            .service(get_languages),
     );
 }
