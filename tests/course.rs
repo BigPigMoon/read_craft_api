@@ -14,7 +14,7 @@ use rc_api::{
     get_app_data, get_db_conn, get_key, main_config,
     models::{
         auth::{SignUpData, Tokens},
-        course::{Course, CreateCourse, UpdateCourse},
+        course::{CourseOut, CreateCourse, UpdateCourse},
         language::Language,
     },
     utils::jwt::{scopes, JwtUtil},
@@ -57,7 +57,7 @@ fn update_course_req(new_course: UpdateCourse, token: &str) -> test::TestRequest
 /// Send reqeust to **/api/course/subscribe/all**
 fn get_subs_course_req(token: &str) -> test::TestRequest {
     test::TestRequest::get()
-        .uri("/api/course/subscribe/all")
+        .uri("/api/course/all?subscriptions=true")
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
@@ -230,7 +230,7 @@ async fn test_get_course_success() {
     // assertion
     assert_eq!(get_course_res.status(), StatusCode::OK);
 
-    let course: Course = test::read_body_json(get_course_res).await;
+    let course: CourseOut = test::read_body_json(get_course_res).await;
 
     assert_eq!(course.title, title);
     assert_eq!(course.language, lang);
@@ -283,7 +283,7 @@ async fn test_get_all_courses() {
 
     assert_eq!(get_courses_res.status(), StatusCode::OK);
 
-    let courses: Vec<Course> = test::read_body_json(get_courses_res).await;
+    let courses: Vec<CourseOut> = test::read_body_json(get_courses_res).await;
 
     assert_ne!(courses.len(), 0);
 }
@@ -647,7 +647,7 @@ async fn test_get_subscribed() {
 
     assert_eq!(subs_res.status(), StatusCode::OK);
 
-    let _: Vec<i32> = test::read_body_json(subs_res).await;
+    let _: Vec<CourseOut> = test::read_body_json(subs_res).await;
 }
 
 #[actix_web::test]
@@ -720,7 +720,7 @@ async fn test_update_course_success() {
 
     assert!(get_course_res.status().is_success());
 
-    let updated_course: Course = test::read_body_json(get_course_res).await;
+    let updated_course: CourseOut = test::read_body_json(get_course_res).await;
 
     assert_eq!(updated_course.title, new_title);
     assert_eq!(updated_course.language, new_language);
