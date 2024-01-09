@@ -26,7 +26,11 @@ pub fn auth_config(cfg: &mut web::ServiceConfig) {
 }
 
 /// Sign up request
+///
 /// Register user in system return pair of JWT
+///
+/// Path:
+/// **/api/auth/signup**
 #[post("/signup")]
 pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) -> impl Responder {
     let op = "signup";
@@ -107,7 +111,11 @@ pub async fn signup(data: web::Json<SignUpData>, app_data: web::Data<AppState>) 
 }
 
 /// Sign in request
+///
 /// Login user in system return pair of JWT
+///
+/// Path:
+/// **/api/auth/signin**
 #[post("/signin")]
 pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) -> impl Responder {
     let op = "sigin";
@@ -185,7 +193,11 @@ pub async fn signin(data: web::Json<SignInData>, app_data: web::Data<AppState>) 
 }
 
 /// Logout request
+///
 /// Clear refresh token from database
+///
+/// Path:
+/// **/api/auth/logout**
 #[post("/logout")]
 pub async fn logout(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
     let op = "logout";
@@ -217,7 +229,11 @@ pub async fn logout(creds: JwtCred, app_data: web::Data<AppState>) -> impl Respo
 }
 
 /// Refresh token request
+///
 /// Get refresh token in header and generate new pairs of JWT
+///
+/// Path:
+/// **/api/auth/refresh**
 #[post("/refresh")]
 pub async fn refresh_token(req: HttpRequest, app_data: web::Data<AppState>) -> impl Responder {
     let op = "refresh_token";
