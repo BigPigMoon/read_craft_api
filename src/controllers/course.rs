@@ -1,10 +1,12 @@
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use futures_util::future::try_join_all;
+use serde::Deserialize;
 use validator::Validate;
 
 use crate::extractors::jwt_cred::JwtCred;
 
 use crate::models::common::ErrorResponse;
-use crate::models::course::{CreateCourse, UpdateCourse};
+use crate::models::course::{CourseOut, CreateCourse, UpdateCourse};
 use crate::services::course::*;
 use crate::AppState;
 
@@ -14,7 +16,6 @@ pub fn course_config(cfg: &mut web::ServiceConfig) {
             .service(create_course)
             .service(get_course)
             .service(get_courses)
-            .service(get_subs)
             .service(delete_course)
             .service(update_course)
             .service(subscribe)
@@ -24,7 +25,11 @@ pub fn course_config(cfg: &mut web::ServiceConfig) {
 }
 
 /// Create course request
+///
 /// Create course with CreateCourse model
+///
+/// Path:
+/// **/api/course/create**
 #[post("/create")]
 pub async fn create_course(
     creds: JwtCred,
@@ -71,22 +76,59 @@ pub async fn create_course(
     HttpResponse::Created().json(new_course_id)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GetAllCoursesFilter {
+    subscriptions: Option<bool>,
+}
+
 /// Get all courses request
+///
+/// Path:
+/// **/api/course/all**
+/// or if need only subscriptions course
+/// **/api/course/all?subscriptions=true**
 #[get("/all")]
-pub async fn get_courses(_: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
+pub async fn get_courses(
+    creds: JwtCred,
+    filter: web::Query<GetAllCoursesFilter>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
     let op = "get_courses";
 
-    log::info!("{}: attempting to get all courses", op);
+    let user_id = creds.uid;
 
-    let courses = match get_courses_db(&app_data.pool).await {
+    log::info!(
+        "{}: attempting to get all courses, filter: {:?}",
+        op,
+        filter
+    );
+
+    let courses;
+
+    if filter.subscriptions.unwrap_or(false) {
+        courses = get_subscribed(creds.uid, &app_data.pool).await;
+    } else {
+        courses = get_courses_db(&app_data.pool).await;
+    }
+
+    let courses = match courses {
         Ok(courses) => courses,
         Err(err) => {
-            log::error!("{}: couldn't get all courses, error: {}", op, err);
+            log::error!("{}: error getting courses, error: {}", op, err);
+
             return HttpResponse::InternalServerError().json(ErrorResponse {
-                message: "can't get all courses".to_string(),
+                message: "can't get courses".to_string(),
             });
         }
     };
+
+    let courses = try_join_all(
+        courses
+            .into_iter()
+            .map(|course| CourseOut::from_course(course, user_id, &app_data.pool)),
+    )
+    .await
+    .unwrap();
 
     log::info!(
         "{}: all courses are returting successful, course count: {}",
@@ -98,14 +140,19 @@ pub async fn get_courses(_: JwtCred, app_data: web::Data<AppState>) -> impl Resp
 }
 
 /// Get course by id request
+///
+/// Path:
+/// **/api/course/get/*{id}***
 #[get("/get/{id}")]
 pub async fn get_course(
-    _: JwtCred,
+    creds: JwtCred,
     path: web::Path<i32>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
-    let course_id = path.into_inner();
     let op = "get_course";
+
+    let course_id = path.into_inner();
+    let user_id = creds.uid;
 
     log::info!(
         "{}: attempting to get course by id: course id: {}",
@@ -114,7 +161,9 @@ pub async fn get_course(
     );
 
     let course = match find_course_by_id(course_id, &app_data.pool).await {
-        Ok(course) => course,
+        Ok(course) => CourseOut::from_course(course, user_id, &app_data.pool)
+            .await
+            .unwrap(),
         Err(err) => {
             log::error!(
                 "{}: course by id: {} is not exist, error: {}",
@@ -128,18 +177,15 @@ pub async fn get_course(
         }
     };
 
-    log::info!(
-        "{}: course are getting, id: {}, title: {}, language: {:?}",
-        op,
-        course.id,
-        course.title,
-        course.language
-    );
+    log::info!("{}: course are getting, course: {:?}", op, course);
 
     HttpResponse::Ok().json(course)
 }
 
 /// Update course, get JSON with new data
+///
+/// Path:
+/// **/api/course/update**
 #[put("/update")]
 pub async fn update_course(
     creds: JwtCred,
@@ -206,6 +252,9 @@ pub async fn update_course(
 }
 
 /// Delete course by id
+///
+/// Path:
+/// **/api/course/delete/*{id}***
 #[delete("/delete/{id}")]
 pub async fn delete_course(
     creds: JwtCred,
@@ -251,38 +300,10 @@ pub async fn delete_course(
     HttpResponse::Ok()
 }
 
-/// Get all courses to which the user is subscribed request
-#[get("/subscribe/all")]
-pub async fn get_subs(creds: JwtCred, app_data: web::Data<AppState>) -> impl Responder {
-    let op = "get_subs";
-
-    log::info!("{}: attempting to get all subscription course", op);
-
-    let courses = match get_subscribed(creds.uid, &app_data.pool).await {
-        Ok(courses) => courses,
-        Err(err) => {
-            log::error!(
-                "{}: error with get all courses in subscribtion, error: {}",
-                op,
-                err
-            );
-
-            return HttpResponse::InternalServerError().json(ErrorResponse {
-                message: "can't get subscribed courses".to_string(),
-            });
-        }
-    };
-
-    log::info!(
-        "{}: all courses are returning successfuly, count of course: {}",
-        op,
-        courses.len()
-    );
-
-    HttpResponse::Ok().json(courses)
-}
-
 /// Subscribes the user to the course request
+///
+/// Path:
+/// **/api/course/subscribe/*{id}***
 #[post("/subscribe/{id}")]
 pub async fn subscribe(
     creds: JwtCred,
@@ -333,6 +354,10 @@ pub async fn subscribe(
     HttpResponse::Ok()
 }
 
+/// Unsubscribe from the course by id
+///
+/// Path:
+/// **/api/course/unsubscribe/*{id}***
 #[post("/unsubscribe/{id}")]
 pub async fn unsubscribe(
     creds: JwtCred,
@@ -384,6 +409,9 @@ pub async fn unsubscribe(
 }
 
 /// Return true if user are owner of course request
+///
+/// Path:
+/// **/api/course/owner/{id}**
 #[get("/owner/{id}")]
 pub async fn is_owner(
     creds: JwtCred,
