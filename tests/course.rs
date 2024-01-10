@@ -62,9 +62,16 @@ fn get_subs_course_req(token: &str) -> test::TestRequest {
 }
 
 /// Send reqeust to **/api/course/subscribe/{id}**
-fn subscribe_to_course_req(course_id: i32, token: &str) -> test::TestRequest {
+fn subscribe_to_course_req(invite_link: &str, token: &str) -> test::TestRequest {
     test::TestRequest::post()
-        .uri(format!("/api/course/subscribe/{course_id}").as_str())
+        .uri(format!("/api/course/subscribe/{invite_link}").as_str())
+        .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
+}
+
+/// Send request to **api/course/invite/generate/{id}**
+fn generate_invite_link_req(course_id: i32, token: &str) -> test::TestRequest {
+    test::TestRequest::get()
+        .uri(format!("/api/course/invite/generate/{course_id}").as_str())
         .append_header((header::AUTHORIZATION, format!("Bearer {token}")))
 }
 
@@ -370,7 +377,15 @@ async fn test_user_is_owner_no() {
 
     let new_course_id = test::read_body_json(new_course).await;
 
-    let sub_res = subscribe_to_course_req(new_course_id, user2.1.as_str())
+    let invite_link = generate_invite_link_req(new_course_id, &user1.1)
+        .send_request(&app)
+        .await;
+
+    assert!(invite_link.status().is_success());
+
+    let invite_link: String = test::read_body_json(invite_link).await;
+
+    let sub_res = subscribe_to_course_req(&invite_link, user2.1.as_str())
         .send_request(&app)
         .await;
 
@@ -443,7 +458,7 @@ async fn test_user_is_owner_is_private() {
 }
 
 #[actix_web::test]
-async fn test_subscribe() {
+async fn test_subscribe_success() {
     let app = test::init_service(
         App::new()
             .app_data(get_app_data().await)
@@ -471,7 +486,15 @@ async fn test_subscribe() {
 
     let new_course_id = test::read_body_json(new_course).await;
 
-    let subscribe_res = subscribe_to_course_req(new_course_id, user2.1.as_str())
+    let invite_link = generate_invite_link_req(new_course_id, &user1.1)
+        .send_request(&app)
+        .await;
+
+    assert!(invite_link.status().is_success());
+
+    let invite_link: String = test::read_body_json(invite_link).await;
+
+    let subscribe_res = subscribe_to_course_req(&invite_link, user2.1.as_str())
         .send_request(&app)
         .await;
 
@@ -520,7 +543,15 @@ async fn test_unsubscribe_success() {
 
     let new_course_id = test::read_body_json(new_course).await;
 
-    let subscribe_res = subscribe_to_course_req(new_course_id, user2.1.as_str())
+    let invite_link = generate_invite_link_req(new_course_id, &user1.1)
+        .send_request(&app)
+        .await;
+
+    assert!(invite_link.status().is_success());
+
+    let invite_link: String = test::read_body_json(invite_link).await;
+
+    let subscribe_res = subscribe_to_course_req(&invite_link, user2.1.as_str())
         .send_request(&app)
         .await;
 
@@ -576,26 +607,6 @@ async fn test_unsubscribe_not_found() {
 }
 
 #[actix_web::test]
-async fn test_subscribe_not_found() {
-    let app = test::init_service(
-        App::new()
-            .app_data(get_app_data().await)
-            .configure(main_config),
-    )
-    .await;
-
-    let user = init_user().await;
-
-    let course_id = i32::MAX;
-
-    let subscribe_res = subscribe_to_course_req(course_id, user.1.as_str())
-        .send_request(&app)
-        .await;
-
-    assert_eq!(subscribe_res.status(), StatusCode::NOT_FOUND);
-}
-
-#[actix_web::test]
 async fn test_subscribe_is_private() {
     let app = test::init_service(
         App::new()
@@ -621,9 +632,17 @@ async fn test_subscribe_is_private() {
 
     assert!(new_course.status().is_success());
 
-    let new_course_id = test::read_body_json(new_course).await;
+    let new_course_id: i32 = test::read_body_json(new_course).await;
 
-    let subscribe_res = subscribe_to_course_req(new_course_id, "wrong data")
+    let invite_link = generate_invite_link_req(new_course_id, &user.1)
+        .send_request(&app)
+        .await;
+
+    assert!(invite_link.status().is_success());
+
+    let invite_link: String = test::read_body_json(invite_link).await;
+
+    let subscribe_res = subscribe_to_course_req(&invite_link, "wrong data")
         .send_request(&app)
         .await;
 
