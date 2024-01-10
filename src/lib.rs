@@ -10,7 +10,8 @@ use std::env;
 
 use actix_web::web;
 use controllers::{
-    auth::auth_config, course::course_config, language::get_languages, lesson::lesson_config,
+    auth::auth_config, book::book_config, course::course_config, language::get_languages,
+    lesson::lesson_config,
 };
 use dotenvy::dotenv;
 use jwt_simple::algorithms::HS256Key;
@@ -53,6 +54,7 @@ pub fn main_config(cfg: &mut web::ServiceConfig) {
             .configure(auth_config)
             .configure(course_config)
             .configure(lesson_config)
+            .configure(book_config)
             .service(get_languages),
     );
 }
