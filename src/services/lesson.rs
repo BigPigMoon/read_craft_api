@@ -56,6 +56,7 @@ pub async fn find_all_lessons(pool: &sqlx::Pool<Postgres>) -> Result<Vec<Lesson>
             id, created_at, updated_at, title, content_path, cover_path, subject, course_id
         FROM
             lessons
+        ORDER BY created_at ASC
         "#
     )
     .fetch_all(pool)
@@ -78,6 +79,7 @@ pub async fn find_lessons_in_course(
             lessons
         WHERE
             course_id = $1
+        ORDER BY created_at ASC
         "#,
         course_id
     )
