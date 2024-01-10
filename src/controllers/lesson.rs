@@ -372,6 +372,8 @@ pub async fn delete_lesson(
         return HttpResponse::InternalServerError();
     }
 
+    // FIXME: also delte lesson file
+
     HttpResponse::Ok()
 }
 
