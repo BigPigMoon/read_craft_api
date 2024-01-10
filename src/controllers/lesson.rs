@@ -140,10 +140,6 @@ pub async fn get_lessons(
     filter: web::Query<GetAllLessonsFilter>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
-    // TODO:
-    //  get the lesson in created_ at order
-    // it is too lazy but not now
-
     let op = "get_lessons";
 
     log::info!("{}: attempting to get lessons, filter: {:?}", op, filter);
