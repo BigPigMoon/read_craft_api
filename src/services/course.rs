@@ -2,6 +2,7 @@ use std::error::Error;
 
 use chrono::Utc;
 use sqlx::Postgres;
+use uuid::Uuid;
 
 use crate::models::{
     course::{Course, CreateCourse, UpdateCourse},
@@ -138,6 +139,23 @@ pub async fn subscribe_to_course(
     Ok(())
 }
 
+/// Check if user already subscribed to course
+pub async fn is_user_already_subscribed(
+    user_id: i32,
+    course_id: i32,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<bool, Box<dyn Error>> {
+    let cousre = sqlx::query!(
+        "SELECT id FROM course_user WHERE course_id = $1 AND user_id = $2",
+        course_id,
+        user_id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(cousre.is_some())
+}
+
 /// user are unsubscribe to course
 pub async fn unsubscribe_to_course(
     user_id: i32,
@@ -181,4 +199,44 @@ pub async fn get_subscribed(
     }
 
     Ok(courses)
+}
+
+/// Generate the invite link for course
+pub async fn generate_link(
+    course_id: i32,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<String, Box<dyn Error>> {
+    let invite_link = Uuid::new_v4().to_string();
+
+    sqlx::query!(
+        "UPDATE courses SET invite_link = $2, updated_at = $3 WHERE id = $1",
+        course_id,
+        Some(&invite_link),
+        Utc::now().naive_utc(),
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(String::from(invite_link))
+}
+
+/// Find the course by invite link
+pub async fn find_course_by_invite_link(
+    link: &str,
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<Course, Box<dyn Error>> {
+    let course = sqlx::query_as!(
+        Course,
+        r#"
+            SELECT
+            id, created_at, updated_at, title, language as "language!: Language"
+            FROM courses
+            WHERE invite_link=$1
+        "#,
+        link
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(course)
 }

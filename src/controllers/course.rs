@@ -20,6 +20,7 @@ pub fn course_config(cfg: &mut web::ServiceConfig) {
             .service(update_course)
             .service(subscribe)
             .service(unsubscribe)
+            .service(generate_invite_link)
             .service(is_owner),
     );
 }
@@ -303,36 +304,61 @@ pub async fn delete_course(
 /// Subscribes the user to the course request
 ///
 /// Path:
-/// **/api/course/subscribe/*{id}***
-#[post("/subscribe/{id}")]
+/// **/api/course/subscribe/*{link}***
+#[post("/subscribe/{link}")]
 pub async fn subscribe(
     creds: JwtCred,
-    path: web::Path<i32>,
+    path: web::Path<String>,
     app_data: web::Data<AppState>,
 ) -> impl Responder {
-    let course_id = path.into_inner();
+    let link = path.into_inner();
 
     let op = "subscribe";
+    let user_id = creds.uid;
 
     log::info!(
-        "{}: attempting to subscribe user on course, user_id: {}, course_id: {}",
+        "{}: attempting to subscribe user on course, user_id: {}, link: {}",
         op,
-        creds.uid,
+        user_id,
+        link
+    );
+
+    let course_id = match find_course_by_invite_link(&link, &app_data.pool).await {
+        Ok(course) => course.id,
+        Err(err) => {
+            log::error!(
+                "{}: course not found, error: {}, course_id: {}",
+                op,
+                err,
+                link
+            );
+
+            return HttpResponse::NotFound();
+        }
+    };
+
+    log::info!(
+        "{}: find course by link {}, course id: {}",
+        op,
+        link,
         course_id
     );
 
-    if let Err(err) = find_course_by_id(course_id, &app_data.pool).await {
-        log::error!(
-            "{}: course not found, error: {}, course_id: {}",
+    if is_user_already_subscribed(user_id, course_id, &app_data.pool)
+        .await
+        .unwrap_or(false)
+    {
+        log::warn!(
+            "{}: user already subscribed to course: user_id: {}, course_id: {}",
             op,
-            err,
+            user_id,
             course_id
         );
 
-        return HttpResponse::NotFound();
+        return HttpResponse::Forbidden();
     }
 
-    if let Err(err) = subscribe_to_course(creds.uid, course_id, &app_data.pool).await {
+    if let Err(err) = subscribe_to_course(user_id, course_id, &app_data.pool).await {
         log::error!(
             "{}: error with subscribe to course, error: {}, course_id: {}, user_id: {}",
             op,
@@ -347,7 +373,7 @@ pub async fn subscribe(
     log::info!(
         "{}: user are successfuly subscribed, user_id: {}, course_id: {}",
         op,
-        creds.uid,
+        user_id,
         course_id
     );
 
@@ -453,4 +479,54 @@ pub async fn is_owner(
     );
 
     HttpResponse::Ok().json(ownered)
+}
+
+/// Generate invite link for course
+///
+/// Path:
+/// **/api/course/invite/generate/*{id}***
+#[get("/invite/generate/{id}")]
+pub async fn generate_invite_link(
+    creds: JwtCred,
+    path: web::Path<i32>,
+    app_data: web::Data<AppState>,
+) -> impl Responder {
+    let op = "generate_invite_link";
+
+    let user_id = creds.uid;
+    let course_id = path.into_inner();
+
+    log::info!(
+        "{}: attempting to generate invite link for course, user_id: {}, course_id: {}",
+        op,
+        user_id,
+        course_id
+    );
+
+    if !user_is_owner(user_id, course_id, &app_data.pool)
+        .await
+        .unwrap_or(false)
+    {
+        log::error!(
+            "{}: user is not owner of course, user_id: {}, course_id: {}",
+            op,
+            user_id,
+            course_id
+        );
+
+        return HttpResponse::Forbidden().json(ErrorResponse {
+            message: "user is not owner of course".to_string(),
+        });
+    }
+
+    match generate_link(course_id, &app_data.pool).await {
+        Ok(link) => HttpResponse::Ok().json(link),
+        Err(err) => {
+            log::error!("{}: can not generate invite link, error: {}", op, err);
+
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                message: "can not generate invite link".to_string(),
+            })
+        }
+    }
 }
