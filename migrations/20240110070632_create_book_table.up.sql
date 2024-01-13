@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS books (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     title TEXT NOT NULL,
     language language NOT NULL,
-    file_path TEXT NOT NULL,
+    filename TEXT NOT NULL,
     cover_path TEXT,
     subject TEXT,
     author TEXT,

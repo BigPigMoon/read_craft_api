@@ -24,6 +24,8 @@ async fn main() -> std::io::Result<()> {
 
     log::info!("starting HTTP server at http://{}", addrs);
 
+    tokio::fs::create_dir_all("uploads/books").await.unwrap();
+
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::new("%r, status: %s, time taken: %D"))

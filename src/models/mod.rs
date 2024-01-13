@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod book;
 pub mod common;
 pub mod course;
 pub mod language;
