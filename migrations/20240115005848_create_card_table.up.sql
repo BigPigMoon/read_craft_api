@@ -1,0 +1,9 @@
+-- Add up migration script here
+CREATE TABLE IF NOT EXISTS cards (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    word TEXT NOT NULL,
+    translation TEXT NOT NULL,
+    group_id INT REFERENCES card_group(id) ON DELETE CASCADE
+)

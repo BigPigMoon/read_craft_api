@@ -8,9 +8,18 @@ services:
       POSTGRES_PASSWORD: "root"
     ports:
       - "5432:5432"
-    volumes: 
+    volumes:
       - db:/var/lib/postgresql/data
+
+  cache:
+    image: "redis:latest"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
 volumes:
+  redis_data:
   db:
     driver: local
-

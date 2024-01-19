@@ -36,4 +36,5 @@ pub struct UpdateBook {
     pub cover_path: Option<String>,
     pub author: Option<String>,
     pub subject: Option<String>,
+    pub progress: i32,
 }

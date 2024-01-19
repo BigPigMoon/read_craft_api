@@ -1,5 +1,6 @@
 use std::env;
 
+
 use tokio::{
     fs::{create_dir_all, File},
     io::{AsyncReadExt, AsyncWriteExt},
@@ -504,7 +505,7 @@ pub async fn get_lesson_text(
 
     // FIXME: add it into app_data!
     dotenv().ok();
-    let file_path = env::var("LESSONS_DIR").unwrap_or("./lessons".to_string());
+    let file_path = env::var("LESSONS_DIR").unwrap_or("./uploads/lessons".to_string());
 
     let mut file = match File::open(format!("{}/{}", &file_path, lesson.content_path)).await {
         Ok(file) => file,

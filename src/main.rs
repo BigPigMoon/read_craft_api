@@ -39,6 +39,7 @@ async fn main() -> std::io::Result<()> {
             )
             .app_data(state.clone())
             .configure(main_config)
+            .service(index)
     })
     .bind(addrs)?
     .run()

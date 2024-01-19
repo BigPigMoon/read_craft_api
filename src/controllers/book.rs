@@ -362,6 +362,29 @@ async fn change_page(
     let num_pages = EpubDoc::new(&filepath).unwrap().get_num_pages() as i32;
 
     if options.page < 0 || options.page >= num_pages {
+        let new_progress = 100;
+
+        if let Err(err) = update_book_db(
+            &UpdateBook {
+                id: book.id,
+                title: book.title,
+                language: book.language,
+                cover_path: book.cover_path,
+                author: book.author,
+                subject: book.subject,
+                progress: new_progress,
+            },
+            &app_data.pool,
+        )
+        .await
+        {
+            log::error!(
+                "{}: can not update the book progress: {}, error: {}",
+                op,
+                book_id,
+                err
+            );
+        }
         return HttpResponse::BadRequest().finish();
     }
 
@@ -375,6 +398,30 @@ async fn change_page(
         );
 
         return HttpResponse::InternalServerError().finish();
+    }
+
+    let new_progress = options.page as f32 / num_pages as f32 * 100.0;
+
+    if let Err(err) = update_book_db(
+        &UpdateBook {
+            id: book.id,
+            title: book.title,
+            language: book.language,
+            cover_path: book.cover_path,
+            author: book.author,
+            subject: book.subject,
+            progress: new_progress.floor() as i32,
+        },
+        &app_data.pool,
+    )
+    .await
+    {
+        log::error!(
+            "{}: can not update the book progress: {}, error: {}",
+            op,
+            book_id,
+            err
+        );
     }
 
     return HttpResponse::Ok().finish();

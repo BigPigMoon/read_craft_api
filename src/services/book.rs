@@ -105,13 +105,14 @@ pub async fn update_book_db(
     pool: &sqlx::Pool<Postgres>,
 ) -> Result<(), Box<dyn Error>> {
     sqlx::query!(
-        "UPDATE books SET title = $2, language = $3, author = $4, subject = $5, cover_path = $6 WHERE id = $1",
+        "UPDATE books SET title = $2, language = $3, author = $4, subject = $5, cover_path = $6, progress = $7 WHERE id = $1",
         book.id,
         book.title,
         book.language as Language,
         book.author,
         book.subject,
         book.cover_path,
+        book.progress
     )
     .execute(pool)
     .await?;

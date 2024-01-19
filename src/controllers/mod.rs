@@ -2,5 +2,8 @@ pub mod auth;
 pub mod book;
 pub mod card;
 pub mod course;
+pub mod group;
+pub mod image;
 pub mod language;
 pub mod lesson;
+pub mod translator;

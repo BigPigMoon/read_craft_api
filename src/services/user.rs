@@ -3,14 +3,19 @@ use crypto::{digest::Digest, sha2::Sha256};
 use sqlx::Postgres;
 use std::error::Error;
 
-use crate::models::user::{CreateUser, User};
+use crate::models::{
+    card::CreateGroup,
+    user::{CreateUser, User},
+};
+
+use super::card::create_group_db;
 
 /// create user function in database
 pub async fn create_user(
     user: &CreateUser,
     pool: &sqlx::Pool<Postgres>,
 ) -> Result<i32, Box<dyn Error>> {
-    let id = sqlx::query!(
+    let user_id = sqlx::query!(
         "INSERT INTO users(email, username, password_hash, refresh_token_hash) VALUES ($1, $2, $3, $4) RETURNING id",
         user.email,
         user.username,
@@ -18,7 +23,24 @@ pub async fn create_user(
         user.refresh_token_hash
     ).fetch_one(pool).await?.id;
 
-    Ok(id)
+    let group_id = create_group_db(
+        &CreateGroup {
+            title: user.username.to_string(),
+            group_id: None,
+        },
+        pool,
+    )
+    .await?;
+
+    sqlx::query!(
+        "INSERT INTO group_user (user_id, group_id) VALUES ($1, $2)",
+        user_id,
+        group_id,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(user_id)
 }
 
 /// find user by id
